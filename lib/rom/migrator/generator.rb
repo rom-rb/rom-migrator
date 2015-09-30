@@ -4,6 +4,8 @@ require "erb"
 
 class ROM::Migrator
 
+  require_relative "generator/binding"
+
   # Scaffolds next migration from name and paths to existing migrations
   #
   # Uses the migrator to define the next migration number and
