@@ -1,0 +1,3 @@
+--asset LICENSE
+--exclude lib/rom-migrator/version.rb
+--output doc/api
