@@ -10,19 +10,48 @@
 
 Base class for [ROM][rom] migrators.
 
+Installation
+------------
+
+Add this line to your application's Gemfile:
+
+```ruby
+# Gemfile
+gem "rom-migrator"
+```
+
+Then execute:
+
+```
+bundle
+```
+
+Or add it manually:
+
+```
+gem install rom-migrator
+```
+
 Usage
 -----
 
-### When creating Custom Adapter
-
-You are supposed to make 4 additional steps to provide adapter with a migrator:
+When creating custom ROM adapter, you should implement its own migrator inherited from `ROM::Migrator`:
 
 - [load the gem](#load-the-gem)
 - [provide the migrator](#provide-the-migrator)
-- [provide the base migration](#provide-the-base-migration)
-- [add rake task](#add-rake-task)
 
-#### Load the Gem
+and customize it as following:
+
+- provide *adapter-specific* methods to [register applied migrations](#implement-methods-to-register-migrations)
+- provide *adapter-specific* methods to [make changes to persistence](#implement-methods-to-make-changes-to-persistence) via ROM gateway
+
+You can also redefine some default settings, namely:
+
+- [default path to migrations](#customize-default-path-to-migrations) (`db/migrate`)
+- [path to template for migrations](#customize-migration-template)
+- [migration number counter](#customize-migration-number-counter)
+
+### Load the Gem
 
 Install and require the gem. It is not loaded by default because there is a bunch of adapters that doesn't need mingrators.
 
@@ -32,38 +61,37 @@ require "rom"
 require "rom-migrator"
 ```
 
-#### Provide the Migrator
+### Provide the Migrator
 
-Subclass the migrator from `ROM::Migrator` and define the `adapter` explicitly:
+Subclass the migrator from `ROM::Migrator`:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
-    adapter :custom_adapter
-  end
-end
-```
-```ruby
-# spec/unit/rom-custom_adapter/migrator_spec.rb
-describe ROM::CustomAdapter::Migrator
-  let(:migrator) { described_class.new }
-
-  describe "#adapter" do
-    subject { migrator.adapter }
-
-    it { is_expected.to eql :custom_adapter }
   end
 end
 ```
 
-Then you MUST define 3 adapter-specific methods, that allow migrator to register/unregister applied migration in a persistence, and find the numbers of migrations being applied:
+### Implement methods to register migrations
+
+You MUST define adapter-specific methods, that allow migrator to register/unregister applied migration in a persistence, and find their numbers.
+
+*In case the adapter's gateway supports `send_query` method*, the definitions can be like the following:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
+
+    # Prepares the table to store applied migrations in a persistence if it is absent.
+    #
+    # @return [undefined]
+    #
+    def prepare_registry
+      gateway.send_query "CREATE TABLE IF NOT EXISTS rom_custom_adapter_migrations;"
+    end
 
     # Registers the number of migration being applied
     #
@@ -72,7 +100,7 @@ module ROM::CustomAdapter
     # @return [undefined]
     #
     def register(number)
-      # ...adapter-specific code
+      gateway.send_query "INSERT number = '#{number}' INTO rom_custom_adapter_migrations;"
     end
 
     # Unregisters the number of migration being rolled back
@@ -82,7 +110,7 @@ module ROM::CustomAdapter
     # @return [undefined]
     #
     def unregister(number)
-      # ...adapter-specific code
+      gateway.send_query "DELETE FROM rom_custom_adapter_migrations WHERE number = '#{number}';"
     end
 
     # Returns the array of registered numbers of applied migrations
@@ -90,65 +118,51 @@ module ROM::CustomAdapter
     # @return [Array<String>]
     #
     def registered
-      # ...adapter-specific code
-    end
-  end
-end
-```
-```ruby
-# spec/unit/rom-custom_adapter/migrator_spec.rb
-describe ROM::CustomAdapter::Migrator
-  let(:migrator) { described_class.new }
-
-  describe "#registered?" do
-    subject { migrator.registered? "1" }
-
-    it { is_expected.to eql false }
-  end
-
-  describe "#register" do
-    subject { migrator.register "1" }
-
-    it "registers the migration" do
-      expect { subject }.to change { migrator.registered? "1" }.to true
-    end
-  end
-
-  describe "#unregister" do
-    subject { migrator.unregister "1" }
-
-    it "unregisters the migration" do
-      migrator.register "1"
-      expect { subject }.to change { migrator.registered? "1" }.to false
+      gateway.send_query("SELECT number FROM rom_custom_adapter_migrations;").map(&:number)
     end
   end
 end
 ```
 
-Customize the default path to migrations. By default it is set to `"db/migrate"`.
+### Implement methods to make changes to persistence
+
+The migration's `#up` and `#down` methods make changes to datastore. In ROM every **gateway** defines its own low-level API to the persistence.
+
+You MUST use the current `#gateway` (link to the gateway instance) **as the only access point to the persistence!**
+You should provide methods like `create`, `delete`, `update` etc., that will be accessible to migrations.
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
-    default_path "custom/migrate"
+    def create_table(name)
+      generator.send_query "CREATE TABLE #{name};"
+    end
+
+    def drop_table(name)
+      generator.send_query "DROP TABLE #{name};"
+    end
+  end
+end
+```
+
+### Customize default path to migrations
+
+By default migrations are expected to be found in `db/migrate`.
+
+```ruby
+# lib/rom-custom_adapter/migrator.rb
+module ROM::CustomAdapter
+  class Migrator < ROM::Migrator
+    # ...
+    default_path "db/migrate/custom_adapter"
     # ...
   end
 end
 ```
-```ruby
-# spec/unit/rom-custom_adapter/migrator_spec.rb
-describe ROM::CustomAdapter::Migrator do
-  let(:migrator) { described_class.new }
 
-  describe "#default_path" do
-    subject { migrator.default_path }
-
-    it { is_expected.to eql "custom/migrate" }
-  end
-end
-```
+### Customize migration number counter
 
 Reload `#next_migration_number`, that defines the number of the migration being generated.
 By default the number is a timestamp in 'YYYYmmddHHMMSS' format.
@@ -174,49 +188,17 @@ module ROM::CustomAdapter
   end
 end
 ```
-```ruby
-# spec/unit/rom-custom_adapter/migrator_spec.rb
-describe ROM::CustomAdapter::Migrator do
-  let(:migrator) { described_class.new }
 
-  describe "#next_migration_number" do
-    subject { migrator.next_migration_number(last_number) }
+### Customize migration template
 
-    context "nil value" do
-      let(:last_number) { nil }
-
-      it { is_expected.to eql 1 }
-    end
-
-    context "string value" do
-      let(:last_number) { "2" }
-
-      it { is_expected.to eql 3 }
-    end
-  end
-end
-```
-
-Customize the template, that will be used by the generator of migrations. The default template is defined by the `rom-migrator` gem.
+The default template is provided by the `rom-migrator` gem.
 
 To add custom template you have to:
+
 - create the template
-- set the path to that template in a migrator 
+- set the path to custom template in a migrator 
 
-The tempate should be ERB file where 2 variables are available:
-- `@name` for the camelized name of the migration
-- `@base` for the camelized name of the adapter-specific migration
-
-```
-# lib/rom-custom_adapter/migration.erb
-class <%= @name %> < <%= @base %>
-  def up
-  end
-
-  def down
-  end
-end
-```
+The tempate should be ERB file where `@klass` contains the name of the migration.
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
@@ -228,116 +210,23 @@ module ROM::CustomAdapter
   end
 end
 ```
-```ruby
-# spec/unit/rom-custom_adapter/migrator_spec.rb
-describe ROM::CustomAdapter::Migrator do
-  let(:migrator) { described_class.new }
+```
+# lib/rom-custom_adapter/migration.erb
+class <%= @klass %> < ROM::Migrator::Migration
+  def up
+  end
 
-  describe "#template" do
-    subject { migrator.template "Bar::Foo" }
-
-    it "returns the proper template" do
-      expect(subject).to eql <<-TEMPLATE.gsub(/\s+\|/, "")
-        |module Bar::Foo < ROM::CustomAdapter::Migration
-        |  def up
-        |  end
-        |
-        |  def down
-        |  end
-        |end
-      TEMPLATE
-    end
+  def down
   end
 end
 ```
 
-#### Provide the Base Migration
+Notice the `Migration` namespace for base migration class above.
 
-The migration API includes 2 public instance methods: `#up` and `#down`. Base migration should define adapter-specific helpers for this methods.
+Using migrator in Application
+-----------------------------
 
-You MUST use the current `#gateway` (link to the gateway instance) **as the only access point to the persistence!**
-
-```ruby
-# lib/rom-custom_adapter/migration.rb
-module ROM::CustomAdapter
-  class Migration < ROM::Migrator::Migration # notice the Migrator namespace!
-
-    # Drops the table in a persistence
-    #
-    # @example
-    #   class CreateFoo < ROM::Migration[:custom_adapter]
-    #     # ...
-    #
-    #     def down
-    #       drop_table :foo
-    #     end
-    #   end
-    #
-    # @param [#to_s] name
-    #
-    # @return [undefined]
-    #
-    def drop_table(name)
-      # Define `send` method in a gateway and use it here:
-      gateway.send "DROP TABLE #{name};"
-    end
-  end
-end
-```
-```ruby
-# spec/unit/rom-custom_adapter/migration_spec.rb
-describe ROM::CustomAdapter::Migration do
-  let(:migration) { described_class.new gateway }
-  let(:gateway)   { double :gateway, send: nil }
-
-  describe "#drop_table" do
-    subject { migration.drop_table :foo }
-
-    it "sends DROP TABLE command to gateway" do
-      expect(gateway).to receive(:send).with "DROP TABLE foo;"
-    end
-  end
-end
-```
-
-#### Add Rake Task
-
-Now that you has a base class for migrations, you can define a rake task to scaffold one:
-
-```ruby
-# lib/rom-custom_adapter/tasks.rake
-require "rom-custom_adapter"
-
-namespace :rom do
-  namespace :custom_adapter do
-    describe "Creates a migration by name with optional path to folder:" \
-             "\nrom:custom_adapter:migration[NAME, custom/path]" \
-             "\nrom:custom_adapter:migration[NAME]"
-    task :migration, [:name, :path] do |t, *args|
-      ROM::CustomAdapter::Migrator.generate(*args)
-    end
-  end
-end
-```
-
-### When using Custom Adapter
-
-When all the stuff before is done, you can use migrator in the application.
-
-To scaffold the migration load the task in Rakefile:
-
-```ruby
-# Rakefile
-load "rom-custom_adapter/tasks.rake"
-```
-
-then run the task from command line:
-
-```
-$ rake rom-custom_adapter:migration[create_foo]
-```
-
-To run migrations you need to connect to persistence datastore:
+To use a migrator you have to prepare ROM environment first:
 
 ```ruby
 require "rom-custom_adapter"
@@ -350,53 +239,57 @@ setup = env.setup :custom_adapter #, whatever additional settings
 setup.finalize
 rom = setup.env
 
-# Migrate the datastore using the environment's gateway
-rom.migrator.migrate  # runs all migrations
-rom.migrator.rollback # rolls all migrations back
+# Access the migrator:
+migrator = rom.migrator
 ```
 
-Methods `#migrate` and `#rollback` takes two options:
+### Running migrations
 
-- the target version to migrate/rollback to (all migrations by default)
-- the list of custom migration folders (`"db/migrate"` by default)
+Use the `apply` and `rollback` methods to apply or roll back migrations:
+
+```ruby
+migrator.apply    # runs all migrations from the default folder
+migrator.rollback # rolls all migrations back
+```
+
+The methods take two options:
+
+- the **target** version to migrate/rollback
+- the list of custom migration **folders** (`db/migrate` by default)
 
 ```ruby
 # Migrations will be taken from folders
-rom.migrate paths: "db/migrate", "spec/dummy/db/migrate"
+migrator.apply folders: ["db/migrate", "spec/dummy/db/migrate"]
 
 # Migrations will be applied from the current version to the target
-rom.migrate target: "20170101234319"
+migrator.apply target: "20170101234319"
 
 # Or rolled back from the current version to the target one
-rom.rollback target: "20170101234319"
+migrator.rollback target: "20170101234319"
 ```
 
-Installation
-------------
+### Scaffolding a Migration
 
-Add this line to your application's Gemfile:
+Use the `#generator` method to scaffold new migration. You have to provide the name of the migration class:
 
 ```ruby
-# Gemfile
-gem "rom-migrator"
+migrator.generate klass: "Users::CreateUser"
+# => `db/migrate/users/1_create_user.rb
 ```
 
-Then execute:
+The generator will check the content of the <default> folder to find out the number of the last migration, and then use `#next_migration_number`.
 
+You're expected to give it a list of all folders, that contain migrations. Otherwise the scaffolder can provide wrong migration number.
+
+The order of folders is sufficient because new migration will be placed to the first one (the others are only used to check existing migrations):
+
+```ruby
+migrator.generate klass: "Users::CreateUser", folders: ["db/migrate", "spec/dummy/db/migrate"]
+# => "/db/migrate/users/1_create_user.rb"
+
+migrator.generate klass: "Users::CreateUser", folders: ["spec/dummy/db/migrate", "db/migrate"]
+# => "/spec/dummy/db/migrate/users/1_create_user.rb"
 ```
-bundle
-```
-
-Or add it manually:
-
-```
-gem install rom-migrator
-```
-
-Design
-------
-
-See the [class diagram at yUML][uml].
 
 Compatibility
 -------------
@@ -436,4 +329,3 @@ See the [MIT LICENSE](LICENSE).
 [rspec]: http://rspec.org
 [rubies]: .travis.yml
 [travis]: https://travis-ci.org/rom-rb/rom-migrator
-[uml]: http://yuml.me/853c702f
