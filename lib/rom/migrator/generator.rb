@@ -17,6 +17,74 @@ class ROM::Migrator
   #
   class Generator
 
+    include Immutability
+    include ROM::Options
+
+    option :folders,  reader: true
+    option :klass,    reader: true, type: String, required: true
+    option :migrator, reader: true
+
+    # Generates new migration it the corresponding folder using default template
+    #
+    # @param [Hash] options
+    # @option (see #initialize)
+    #
+    # @return (see #call)
+    #
+    def self.call(options)
+      new(options).call
+    end
+
+    # @!method initialize(options)
+    # Initializes the generator
+    #
+    # @option (see ROM::Migrator#generate)
+    #
+    def initialize(_)
+      super
+      @klass = Functions.fetch(:up)[@klass]
+    end
+
+    # Generates new migration it the corresponding folder using default template
+    #
+    # @return [self] itself
+    #
+    def call
+      prepare_folder
+      File.new(file.path, "w").write(content)
+    end
+
+    private
+
+    def prepare_folder
+      FileUtils.mkdir_p Pathname.new(file.path).dirname
+    end
+
+    def file
+      MigrationFile.new folder: folders.first, klass: klass, number: number.to_s
+    end
+
+    def number
+      migrator.next_migration_number(last_number)
+    end
+
+    def last_number
+      last_migration = MigrationFiles.new(folders).to_a.last
+      last_migration.number if last_migration
+    end
+
+    def content
+      ERB.new(template).result(view_binding)
+    end
+
+    def template
+      File.read(migrator.template)
+    end
+
+    def view_binding
+      Binding[klass]
+    end
+
   end # class Generator
 
 end # class ROM::Migrator
