@@ -8,6 +8,8 @@ module ROM
   require_relative "migrator/functions"       # pure functions
   require_relative "migrator/errors"          # gem-specific errors
 
+  require_relative "migrator/migration"       # changes the persistence
+
   require_relative "migrator/runner"          # applies / rolls back migrations
   require_relative "migrator/generator"       # scaffolds migrations
 
