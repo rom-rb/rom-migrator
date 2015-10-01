@@ -8,5 +8,6 @@ module ROM
 
   require_relative "rom/migrator/version"
   require_relative "rom/migrator"
+  require_relative "rom/gateway"
 
 end # module ROM

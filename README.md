@@ -239,8 +239,8 @@ setup = env.setup :custom_adapter #, whatever additional settings
 setup.finalize
 rom = setup.env
 
-# Access the migrator:
-migrator = rom.migrator
+# Access the migrator via corresponding Gateway:
+migrator = rom.gateways[:default].migrator
 ```
 
 ### Running migrations
