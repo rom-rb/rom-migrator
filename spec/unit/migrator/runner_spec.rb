@@ -20,6 +20,32 @@ describe ROM::Migrator::Runner do
     it { is_expected.to be_immutable }
   end # describe .new
 
+  describe ".apply" do
+    after { described_class.apply(options) }
+
+    let(:runner) { frozen_double :runner, apply: nil }
+
+    it "instantiates and applies the runner" do
+      allow(described_class).to receive(:new) { runner }
+
+      expect(described_class).to receive(:new).with options
+      expect(runner).to receive(:apply)
+    end
+  end # describe .apply
+
+  describe ".rollback" do
+    after { described_class.rollback(options) }
+
+    let(:runner) { frozen_double :runner, rollback: nil }
+
+    it "instantiates the runner and rollbacks migrations" do
+      allow(described_class).to receive(:new) { runner }
+
+      expect(described_class).to receive(:new).with options
+      expect(runner).to receive(:rollback)
+    end
+  end # describe .rollback
+
   describe "#options" do
     subject { runner.options }
 

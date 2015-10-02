@@ -14,9 +14,29 @@ class ROM::Migrator
     include Immutability
     include Enumerable
 
-    option :folders, reader: true
-    option :target, reader: true
+    option :folders,  reader: true
     option :migrator, reader: true
+    option :target,   reader: true
+
+    # Instantiates and applies the runner at once
+    #
+    # @param (see #initialize)
+    #
+    # @return (see #apply)
+    #
+    def self.apply(options)
+      new(options).apply
+    end
+
+    # Instantiates the runner and rolls back migrations at once
+    #
+    # @param (see #initialize)
+    #
+    # @return (see #rollback)
+    #
+    def self.rollback(options)
+      new(options).rollback
+    end
 
     # @!attribute [r] files
     #
@@ -36,7 +56,7 @@ class ROM::Migrator
     # @option options [String, nil] :target
     #   Optional target number to which the migrations should be applied,
     #   or rolled back
-    # @option options [ROM::Migrator]
+    # @option options [ROM::Migrator] :migrator
     #   The back reference to the migrator
     #
     def initialize(*)
