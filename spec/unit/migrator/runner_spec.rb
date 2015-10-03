@@ -7,6 +7,7 @@ describe ROM::Migrator::Runner do
   let(:folders)    { ["db/migrate", "spec/dummy/db/migrate"] }
   let(:target)     { "2" }
   let(:registered) { [] }
+  let(:logger)     { double :logger, info: nil, error: nil }
   let(:migrator) do
     frozen_double(
       :migrator, go: nil, register: nil, unregister: nil, registered: registered
@@ -21,7 +22,7 @@ describe ROM::Migrator::Runner do
   end # describe .new
 
   describe ".apply" do
-    after { described_class.apply(options) }
+    after { described_class.apply(options.merge(logger: logger)) }
 
     let(:runner) { frozen_double :runner, apply: nil }
 
@@ -29,12 +30,12 @@ describe ROM::Migrator::Runner do
       allow(described_class).to receive(:new) { runner }
 
       expect(described_class).to receive(:new).with options
-      expect(runner).to receive(:apply)
+      expect(runner).to receive(:apply).with logger
     end
   end # describe .apply
 
   describe ".rollback" do
-    after { described_class.rollback(options) }
+    after { described_class.rollback(options.merge(logger: logger)) }
 
     let(:runner) { frozen_double :runner, rollback: nil }
 
@@ -42,7 +43,7 @@ describe ROM::Migrator::Runner do
       allow(described_class).to receive(:new) { runner }
 
       expect(described_class).to receive(:new).with options
-      expect(runner).to receive(:rollback)
+      expect(runner).to receive(:rollback).with logger
     end
   end # describe .rollback
 
@@ -82,7 +83,7 @@ describe ROM::Migrator::Runner do
   end # describe #files
 
   describe "#apply", :memfs do
-    subject { runner.apply }
+    subject { runner.apply(logger) }
     include_context :migrations
 
     context "without target" do
@@ -111,7 +112,7 @@ describe ROM::Migrator::Runner do
   end # describe #apply
 
   describe "#rollback", :memfs do
-    subject { runner.rollback }
+    subject { runner.rollback(logger) }
     include_context :migrations
 
     context "without target" do

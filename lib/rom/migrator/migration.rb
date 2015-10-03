@@ -23,20 +23,34 @@ class ROM::Migrator
 
     # Applies the migration and then registers in in the gateway
     #
+    # @param [::Logger] logger
+    #
     # @return [undefined]
     #
-    def apply
+    def apply(logger)
       up
       register number
+      logger.info "Migration number '#{number}' has been applied"
+    rescue => error
+      logger.error "An error occured while applying" \
+                   " migration number '#{number}':\n#{error}"
+      raise
     end
 
     # Rolls back the migration and unregisters it the gateway
     #
+    # @param [::Logger] logger
+    #
     # @return [undefined]
     #
-    def rollback
+    def rollback(logger)
       down
       unregister number
+      logger.info "Migration number '#{number}' has been rolled back"
+    rescue => error
+      logger.error "An error occured while rolling back" \
+                   " migration number '#{number}':\n#{error}"
+      raise
     end
 
     # Applies the migration

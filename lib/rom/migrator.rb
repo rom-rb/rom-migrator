@@ -1,17 +1,18 @@
 # encoding: utf-8
 
-require "rom"
 require "immutability"
+require "logger"
+require "rom"
 
 module ROM
 
   require_relative "migrator/functions"       # pure functions
   require_relative "migrator/errors"          # gem-specific errors
 
+  require_relative "migrator/logger"          # default logger for migration
   require_relative "migrator/migration"       # changes the persistence
   require_relative "migrator/migration_file"  # file description
   require_relative "migrator/migration_files" # filterable collection of files
-
   require_relative "migrator/runner"          # applies / rolls back migrations
   require_relative "migrator/generator"       # scaffolds migrations
 
@@ -140,10 +141,14 @@ module ROM
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
     #   ones, or default path, to look for migrations.
+    # @option options [::Logger] :logger
+    #   The mutable IO object to log results of migrations
+    #   By default uses an instance of [ROM::Migrator::Logger]
     #
     # @return [self] itself
     #
     def apply(options)
+      options[:logger] ||= Logger.new
       Runner.apply options.merge(migrator: self)
       self
     end
@@ -158,10 +163,14 @@ module ROM
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
     #   ones, or default path, to look for migrations.
+    # @option options [::Logger] :logger
+    #   The mutable IO object to log results of migrations
+    #   By default uses an instance of [ROM::Migrator::Logger]
     #
     # @return [self] itself
     #
     def rollback(options)
+      options[:logger] ||= Logger.new
       Runner.rollback options.merge(migrator: self)
       self
     end

@@ -5,6 +5,7 @@ describe ROM::Migrator::Migration do
   let(:migration) { klass.new(migrator: migrator, number: number) }
   let(:migrator)  { frozen_double :migrator, register: nil, unregister: nil }
   let(:number)    { "1" }
+  let(:logger)    { double :logger, info: nil, error: nil }
 
   describe ".new" do
     subject { described_class.new(migrator: migrator, number: number) }
@@ -43,47 +44,87 @@ describe ROM::Migrator::Migration do
   end # describe #down
 
   describe "#apply" do
-    subject { migration.apply }
+    subject { migration.apply(logger) }
 
     it "calls #up" do
       expect(migration).to receive(:up)
       subject
     end
 
-    it "registers the number" do
-      expect(migrator).to receive(:register).with(number)
-      subject
+    context "when #up passes" do
+      it "registers the number" do
+        expect(migrator).to receive(:register).with(number)
+        subject
+      end
+
+      it "logs the result" do
+        expect(logger)
+          .to receive(:info)
+          .with("Migration number '1' has been applied")
+        subject
+      end
     end
 
     context "when #up fails" do
-      before { allow(migration).to receive(:up) { fail } }
+      before { allow(migration).to receive(:up) { fail "err" } }
 
       it "doesn't register number" do
         expect(migrator).not_to receive(:register)
         subject rescue nil
       end
+
+      it "logs the result" do
+        expect(logger)
+          .to receive(:error)
+          .with("An error occured while applying migration number '1':\nerr")
+        subject rescue nil
+      end
+
+      it "re-raises an error" do
+        expect { subject }.to raise_error StandardError, /err/
+      end
     end
   end # describe #register
 
   describe "#rollback" do
-    subject { migration.rollback }
+    subject { migration.rollback(logger) }
 
     it "calls #down" do
       expect(migration).to receive(:down)
       subject
     end
 
-    it "registers the number" do
-      expect(migrator).to receive(:unregister).with(number)
-      subject
+    context "when #down passes" do
+      it "unregisters the number" do
+        expect(migrator).to receive(:unregister).with(number)
+        subject
+      end
+
+      it "logs the result" do
+        expect(logger)
+          .to receive(:info)
+          .with("Migration number '1' has been rolled back")
+        subject
+      end
     end
 
     context "when #down fails" do
-      before { allow(migration).to receive(:down) { fail } }
+      before { allow(migration).to receive(:down) { fail "err" } }
 
       it "doesn't unregister number" do
         expect(migrator).not_to receive(:unregister)
         subject rescue nil
+      end
+
+      it "logs the result" do
+        expect(logger)
+          .to receive(:error)
+          .with "An error occured while rolling back migration number '1':\nerr"
+        subject rescue nil
+      end
+
+      it "re-raises an error" do
+        expect { subject }.to raise_error StandardError, /err/
       end
     end
   end # describe #unregister

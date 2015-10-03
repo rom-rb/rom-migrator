@@ -20,22 +20,26 @@ class ROM::Migrator
 
     # Instantiates and applies the runner at once
     #
-    # @param (see #initialize)
+    # @param [Hash] options
+    # @option (see #initialize)
     #
     # @return (see #apply)
     #
     def self.apply(options)
-      new(options).apply
+      logger = options.delete(:logger)
+      new(options).apply logger
     end
 
     # Instantiates the runner and rolls back migrations at once
     #
-    # @param (see #initialize)
+    # @param [Hash] options
+    # @option (see #initialize)
     #
     # @return (see #rollback)
     #
     def self.rollback(options)
-      new(options).rollback
+      logger = options.delete(:logger)
+      new(options).rollback logger
     end
 
     # @!attribute [r] files
@@ -66,22 +70,26 @@ class ROM::Migrator
 
     # Applies all migrations in the collection
     #
+    # @param [::Logger] logger
+    #
     # @return [undefined]
     #
-    def apply
+    def apply(logger)
       files_to_apply
         .map { |file| file.build_migration(migrator) }
-        .each(&:apply)
+        .each { |migration| migration.apply(logger) }
     end
 
     # Rolls back all migrations in the collection
     #
+    # @param [::Logger] logger
+    #
     # @return [undefined]
     #
-    def rollback
+    def rollback(logger)
       files_to_rollback
         .map { |file| file.build_migration(migrator) }
-        .reverse_each(&:rollback)
+        .reverse_each { |migration| migration.rollback(logger) }
     end
 
     private

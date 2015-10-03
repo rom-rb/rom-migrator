@@ -254,8 +254,9 @@ migrator.rollback # rolls all migrations back
 
 The methods take two options:
 
-- the **target** version to migrate/rollback
-- the list of custom migration **folders** (`db/migrate` by default)
+- a **target** version to migrate/rollback
+- a list of custom migrations **folders** (`db/migrate` by default)
+- a custom **logger**
 
 ```ruby
 # Migrations will be taken from folders
@@ -266,6 +267,12 @@ migrator.apply target: "20170101234319"
 
 # Or rolled back from the current version to the target one
 migrator.rollback target: "20170101234319"
+```
+
+By default methods logs the result to stdio. You can change this by setting custom logger:
+
+```ruby
+migrator.apply logger: Logger.new
 ```
 
 ### Scaffolding a Migration

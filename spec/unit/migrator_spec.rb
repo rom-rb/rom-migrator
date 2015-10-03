@@ -5,10 +5,12 @@ require "timecop"
 
 describe ROM::Migrator do
 
-  let(:klass)    { Class.new(described_class) }
-  let(:migrator) { klass.new gateway }
-  let(:gateway)  { frozen_double :gateway }
-  let(:folders)  { ["db/migrate", "spec/dummy/db/migrate"] }
+  let(:klass)     { Class.new(described_class) }
+  let(:runner)    { ROM::Migrator::Runner }
+  let(:generator) { ROM::Migrator::Generator }
+  let(:migrator)  { klass.new gateway }
+  let(:gateway)   { frozen_double :gateway }
+  let(:folders)   { ["db/migrate", "spec/dummy/db/migrate"] }
 
   describe ".default_path" do
     it "gets/sets custom path" do
@@ -78,8 +80,8 @@ describe ROM::Migrator do
     subject { migrator.apply options }
     before  { allow(runner).to receive(:apply) }
 
-    let(:runner)  { ROM::Migrator::Runner }
-    let(:options) { { folders: folders, target: "109" } }
+    let(:options) { { folders: folders, target: "109", logger: logger } }
+    let(:logger)  { double :logger }
 
     it "applies runner" do
       expect(runner)
@@ -89,14 +91,25 @@ describe ROM::Migrator do
     end
 
     it { is_expected.to eql migrator }
+
+    context "without logger" do
+      let(:options) { { folders: folders, target: "109" } }
+
+      it "uses default logger" do
+        expect(runner).to receive(:apply) do |options|
+          expect(options[:logger]).to be_kind_of ROM::Migrator::Logger
+        end
+        subject
+      end
+    end
   end # describe #apply
 
   describe "#rollback" do
     subject { migrator.rollback options }
     before  { allow(runner).to receive(:rollback) }
 
-    let(:runner)  { ROM::Migrator::Runner }
-    let(:options) { { folders: folders, target: "109" } }
+    let(:options) { { folders: folders, target: "109", logger: logger } }
+    let(:logger)  { double :logger }
 
     it "builds and rolls back runner" do
       expect(runner)
@@ -108,14 +121,24 @@ describe ROM::Migrator do
     it "returns itself" do
       expect(subject).to eql migrator
     end
+
+    context "without logger" do
+      let(:options) { { folders: folders, target: "109" } }
+
+      it "uses default logger" do
+        expect(runner).to receive(:rollback) do |options|
+          expect(options[:logger]).to be_kind_of ROM::Migrator::Logger
+        end
+        subject
+      end
+    end
   end # describe #rollback
 
   describe "#generate" do
     subject { migrator.generate options }
     before  { allow(generator).to receive(:call) }
 
-    let(:generator) { ROM::Migrator::Generator }
-    let(:options)   { { folders: folders, klass: "Foo::Bar" } }
+    let(:options) { { folders: folders, klass: "Foo::Bar" } }
 
     it "builds and calls a generator" do
       expect(generator)
