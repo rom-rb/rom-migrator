@@ -6,12 +6,6 @@ describe ROM::Migrator::MigrationFiles, :memfs do
   let(:files) { described_class.new(folders) }
   let(:not_found_error) { ROM::Migrator::Errors::NotFoundError }
 
-  describe ".new" do
-    subject { files }
-
-    it { is_expected.to be_immutable }
-  end # describe .new
-
   describe "#folders" do
     subject { files.folders }
 
@@ -43,6 +37,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.with_numbers }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w()
       end
@@ -52,6 +47,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.with_numbers("1") }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w(1)
       end
@@ -61,6 +57,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.with_numbers("1", ["2"]) }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w(1 2)
       end
@@ -91,6 +88,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.after_numbers("1") }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w(2 3)
       end
@@ -100,6 +98,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.after_numbers("0", ["1"]) }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w(2 3)
       end
@@ -109,6 +108,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.after_numbers("4") }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w()
       end
@@ -120,6 +120,7 @@ describe ROM::Migrator::MigrationFiles, :memfs do
       subject { files.upto_number("2") }
 
       it "returns updated collection" do
+        expect(subject).not_to eql files
         expect(subject).to be_kind_of described_class
         expect(subject.map(&:number)).to eql %w(1 2)
       end

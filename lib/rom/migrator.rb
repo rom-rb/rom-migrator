@@ -1,6 +1,5 @@
 # encoding: utf-8
 
-require "immutability"
 require "logger"
 require "rom"
 
@@ -65,8 +64,6 @@ module ROM
   # @abstract
   #
   class Migrator
-
-    include Immutability
 
     # Gets or sets the adapter-specific default path to migrations
     #

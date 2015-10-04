@@ -11,7 +11,6 @@ class ROM::Migrator
   class Runner
 
     include ROM::Options
-    include Immutability
     include Enumerable
 
     option :folders,  reader: true

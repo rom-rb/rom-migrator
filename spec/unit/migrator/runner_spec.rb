@@ -9,7 +9,7 @@ describe ROM::Migrator::Runner do
   let(:registered) { [] }
   let(:logger)     { double :logger, info: nil, error: nil }
   let(:migrator) do
-    frozen_double(
+    double(
       :migrator, go: nil, register: nil, unregister: nil, registered: registered
     )
   end
@@ -18,13 +18,12 @@ describe ROM::Migrator::Runner do
     subject { runner }
 
     it { is_expected.to be_kind_of Enumerable }
-    it { is_expected.to be_immutable }
   end # describe .new
 
   describe ".apply" do
     after { described_class.apply(options.merge(logger: logger)) }
 
-    let(:runner) { frozen_double :runner, apply: nil }
+    let(:runner) { double :runner, apply: nil }
 
     it "instantiates and applies the runner" do
       allow(described_class).to receive(:new) { runner }
@@ -37,7 +36,7 @@ describe ROM::Migrator::Runner do
   describe ".rollback" do
     after { described_class.rollback(options.merge(logger: logger)) }
 
-    let(:runner) { frozen_double :runner, rollback: nil }
+    let(:runner) { double :runner, rollback: nil }
 
     it "instantiates the runner and rollbacks migrations" do
       allow(described_class).to receive(:new) { runner }

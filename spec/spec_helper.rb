@@ -12,11 +12,9 @@ end
 require "rom-migrator"
 
 # Loads gems-specific shared examples
-require "immutability/rspec"
 require "transproc/rspec"
 
 # Loads some helpers and shared contexts
 require "support/memfs"
-require "support/frozen_double"
 require "shared/custom_template"
 require "shared/migrations"

@@ -17,7 +17,6 @@ class ROM::Migrator
   #
   class Generator
 
-    include Immutability
     include ROM::Options
 
     option :folders,  reader: true

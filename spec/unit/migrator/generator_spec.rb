@@ -8,13 +8,13 @@ describe ROM::Migrator::Generator do
   let(:klass)     { "users/create_user" }
 
   let(:migrator) do # mock the migrator with a number counter
-    object = frozen_double :migrator, template: "/config/custom_migration.erb"
+    object = double :migrator, template: "/config/custom_migration.erb"
     allow(object).to receive(:next_migration_number) { |i| i.to_i + 1 }
     object
   end
 
   describe ".call" do
-    let(:generator) { frozen_double :generator, call: nil }
+    let(:generator) { double :generator, call: nil }
 
     before { allow(described_class).to receive(:new) { generator } }
     after  { described_class.call options }
@@ -28,9 +28,11 @@ describe ROM::Migrator::Generator do
   describe ".new" do
     subject { generator }
 
-    it { is_expected.to be_immutable }
+    context "with a klass name" do
+      it { is_expected.to be_kind_of described_class }
+    end
 
-    context "without klass" do
+    context "without klass name" do
       let(:klass) { nil }
 
       it "fails" do

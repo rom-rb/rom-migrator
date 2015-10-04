@@ -4,7 +4,7 @@ describe ROM::Migrator::MigrationFile do
 
   let(:klass)      { Class.new(described_class) }
   let(:name_error) { described_class::MigrationNameError }
-  let(:migrator)   { frozen_double :migrator }
+  let(:migrator)   { double :migrator }
 
   let(:fn) { klass.new folder: "/foo", path: "/foo/bar_baz/n_baz_qux.rb" }
   let(:kn) { klass.new folder: "/foo", klass: "BarBaz::BazQux", number: "n" }
@@ -13,7 +13,7 @@ describe ROM::Migrator::MigrationFile do
     context "with valid arguments" do
       subject { fn }
 
-      it { is_expected.to be_immutable }
+      it { is_expected.to be_kind_of described_class }
     end
 
     context "with wrong filename" do

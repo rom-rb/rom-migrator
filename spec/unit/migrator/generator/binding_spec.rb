@@ -5,12 +5,6 @@ describe ROM::Migrator::Generator::Binding do
   let(:klass)   { "Foo::Bar" }
   let(:adapter) { :custom_adapter }
 
-  describe ".new" do
-    subject { binding }
-
-    it { is_expected.to be_immutable }
-  end # describe .new
-
   describe ".[]" do
     subject { described_class[klass] }
 

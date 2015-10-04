@@ -8,8 +8,6 @@ module ROM::Migrator::Errors
   #
   class MigrationNameError < ::NameError
 
-    include Immutability
-
     # Initializes the exception for the wrong path
     #
     # @param [#to_s] path

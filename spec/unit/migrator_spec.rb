@@ -9,7 +9,7 @@ describe ROM::Migrator do
   let(:runner)    { ROM::Migrator::Runner }
   let(:generator) { ROM::Migrator::Generator }
   let(:migrator)  { klass.new gateway }
-  let(:gateway)   { frozen_double :gateway }
+  let(:gateway)   { double :gateway }
   let(:folders)   { ["db/migrate", "spec/dummy/db/migrate"] }
 
   describe ".default_path" do
@@ -31,12 +31,6 @@ describe ROM::Migrator do
         .to("custom")
     end
   end # describe .adapter
-
-  describe ".new" do
-    subject { migrator }
-
-    it { is_expected.to be_immutable }
-  end # describe .new
 
   describe "#gateway" do
     subject { migrator.gateway }

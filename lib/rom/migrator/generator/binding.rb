@@ -10,8 +10,6 @@ class ROM::Migrator
     #
     class Binding
 
-      include Immutability
-
       # Builds and returns a binding for the template
       #
       # @param [String] klass The migration class

@@ -3,15 +3,9 @@
 describe ROM::Migrator::Migration do
   let(:klass)     { Class.new(described_class) { define_method(:freeze) {} } }
   let(:migration) { klass.new(migrator: migrator, number: number) }
-  let(:migrator)  { frozen_double :migrator, register: nil, unregister: nil }
+  let(:migrator)  { double :migrator, register: nil, unregister: nil }
   let(:number)    { "1" }
   let(:logger)    { double :logger, info: nil, error: nil }
-
-  describe ".new" do
-    subject { described_class.new(migrator: migrator, number: number) }
-
-    it { is_expected.to be_immutable }
-  end # describe .new
 
   describe "#options" do
     subject { migration.options }

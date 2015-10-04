@@ -34,7 +34,6 @@ class ROM::Migrator
   #
   class MigrationFiles
 
-    include Immutability
     include Enumerable
     include Errors
 
@@ -128,6 +127,10 @@ class ROM::Migrator
     def find(number)
       result = detect { |file| number.eql? file.number }
       result || fail(NotFoundError.new(number, folders))
+    end
+
+    def update(&block)
+      dup.tap { |instance| instance.instance_eval(&block) }
     end
 
   end # class MigrationFiles

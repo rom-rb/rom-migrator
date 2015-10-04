@@ -16,7 +16,6 @@ class ROM::Migrator
   class Migration
 
     include ROM::Options
-    include Immutability
 
     option :migrator, reader: true
     option :number,   reader: true

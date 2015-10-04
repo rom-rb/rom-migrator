@@ -33,7 +33,6 @@ class ROM::Migrator
   class MigrationFile
 
     include ROM::Options
-    include Immutability
     include Errors
 
     option :folder, reader: true, type: String, required: true

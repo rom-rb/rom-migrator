@@ -19,7 +19,6 @@ Gem::Specification.new do |gem|
   gem.required_ruby_version = "~> 1.9", ">= 1.9.3"
 
   gem.add_runtime_dependency "rom", "~> 0.9", ">= 0.9.1"
-  gem.add_runtime_dependency "immutability", "~> 0.0.1"
 
   gem.add_development_dependency "hexx-rspec", "~> 0.5"
   gem.add_development_dependency "inflecto", "~> 0.0", ">= 0.0.2"

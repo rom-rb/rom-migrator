@@ -6,7 +6,6 @@ describe ROM::Migrator::Errors::MigrationNameError do
   describe ".new" do
     subject { error }
 
-    it { is_expected.to be_frozen }
     it { is_expected.to be_kind_of ::NameError }
   end # describe .new
 

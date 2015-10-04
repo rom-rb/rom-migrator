@@ -8,8 +8,6 @@ module ROM::Migrator::Errors
   #
   class NotFoundError < ::IOError
 
-    include Immutability
-
     # Initializes the exception for the wrong number
     #
     # @param [#to_s] number The number of migration
