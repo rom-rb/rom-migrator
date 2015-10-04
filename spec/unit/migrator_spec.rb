@@ -5,7 +5,7 @@ require "timecop"
 
 describe ROM::Migrator do
 
-  let(:klass)     { Class.new(described_class) }
+  let(:klass)     { Class.new(described_class) { def prepare_registry; end } }
   let(:runner)    { ROM::Migrator::Runner }
   let(:generator) { ROM::Migrator::Generator }
   let(:migrator)  { klass.new gateway }
@@ -31,6 +31,16 @@ describe ROM::Migrator do
         .to("custom")
     end
   end # describe .adapter
+
+  describe ".new" do
+    before do
+      klass.send(:define_method, :prepare_registry) { @registry = :ok }
+    end
+
+    it "prepares versions registry" do
+      expect(migrator.instance_variable_get :@registry).to eql :ok
+    end
+  end # describe .new
 
   describe "#gateway" do
     subject { migrator.gateway }

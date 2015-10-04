@@ -113,6 +113,7 @@ module ROM
       @gateway      = gateway
       @default_path = self.class.default_path
       @template     = self.class.template
+      prepare_registry
     end
 
     # @!method next_migration_number(last_number)

@@ -2,9 +2,10 @@
 
 describe ROM::Gateway do
   before do
-    ROM::Custom = Module.new
-    ROM::Custom::Migrator = Class.new(ROM::Migrator)
-    ROM::Custom::Gateway  = Class.new(ROM::Gateway) { adapter :custom }
+    module ROM::Custom
+      Gateway  = Class.new(ROM::Gateway)  { adapter :custom }
+      Migrator = Class.new(ROM::Migrator) { def prepare_registry; end }
+    end
     ROM.register_adapter :custom, ROM::Custom
   end
 
