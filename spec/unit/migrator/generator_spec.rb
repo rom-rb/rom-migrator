@@ -9,7 +9,7 @@ describe ROM::Migrator::Generator do
 
   let(:migrator) do # mock the migrator with a number counter
     object = double :migrator, template: "/config/custom_migration.erb"
-    allow(object).to receive(:next_migration_number) { |i| i.to_i + 1 }
+    allow(object).to receive(:next_migration_number) { |i| "#{i.to_i + 1}m" }
     object
   end
 
@@ -47,6 +47,32 @@ describe ROM::Migrator::Generator do
     it { is_expected.to eql options }
   end # describe #options
 
+  describe "#number", :memfs do
+    subject { generator.number }
+
+    context "when set explicitly" do
+      before { options.update(number: 7) }
+
+      it "is taken from options" do
+        expect(subject).to eql "7"
+      end
+    end
+
+    context "if no migrations exist" do
+      it "is the first number" do
+        expect(subject).to eql "1m"
+      end
+    end
+
+    context "if migrations exist" do
+      include_context :migrations
+
+      it "is the next number" do
+        expect(subject).to eql "4m"
+      end
+    end
+  end # describe #number
+
   describe "#migrator" do
     subject { generator.migrator }
 
@@ -73,7 +99,7 @@ describe ROM::Migrator::Generator do
     context "if no migrations exist" do
       it "generates first migration" do
         subject
-        content = File.read "db/migrate/users/1_create_user.rb"
+        content = File.read "db/migrate/users/1m_create_user.rb"
         expect(content)
           .to include "class Users::CreateUser < ROM::Migrator::Migration"
       end
@@ -84,7 +110,7 @@ describe ROM::Migrator::Generator do
 
       it "generates next migration" do
         subject
-        content = File.read "db/migrate/users/4_create_user.rb"
+        content = File.read "db/migrate/users/4m_create_user.rb"
         expect(content)
           .to include "class Users::CreateUser < ROM::Migrator::Migration"
       end

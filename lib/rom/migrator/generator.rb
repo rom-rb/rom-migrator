@@ -22,6 +22,7 @@ class ROM::Migrator
     option :folders,  reader: true
     option :klass,    reader: true, type: String, required: true
     option :migrator, reader: true
+    option :number,   reader: true
 
     # Generates new migration it the corresponding folder using default template
     #
@@ -41,7 +42,8 @@ class ROM::Migrator
     #
     def initialize(_)
       super
-      @klass = Functions.fetch(:up)[@klass]
+      @klass  = Functions.fetch(:up)[@klass]
+      @number = (number || migrator.next_migration_number(last_number)).to_s
     end
 
     # Generates new migration it the corresponding folder using default template
@@ -60,11 +62,7 @@ class ROM::Migrator
     end
 
     def file
-      MigrationFile.new folder: folders.first, klass: klass, number: number.to_s
-    end
-
-    def number
-      migrator.next_migration_number(last_number)
+      MigrationFile.new folder: folders.first, klass: klass, number: number
     end
 
     def last_number

@@ -277,26 +277,37 @@ migrator.apply logger: Logger.new
 
 ### Scaffolding a Migration
 
-Use the `#generator` method to scaffold new migration. You have to provide the name of the migration class:
+Use the `#generator` method to scaffold new migration. You MUST provide the name of the migration class. Migration number CAN be provided as well:
 
 ```ruby
-migrator.generate klass: "Users::CreateUser"
+migrator.generate klass: "Users::CreateUser", number: "1"
 # => `db/migrate/users/1_create_user.rb
 ```
 
-The generator will check the content of the <default> folder to find out the number of the last migration, and then use `#next_migration_number`.
+The result will be stored in the default folder.
 
-You're expected to give it a list of all folders, that contain migrations. Otherwise the scaffolder can provide wrong migration number.
-
-The order of folders is sufficient because new migration will be placed to the first one (the others are only used to check existing migrations):
+When the number is skipped, the generator will check the content of the <default> folder to find out the number of the last migration, and apply `#next_migration_number` method to count the number for the migration being created.
 
 ```ruby
-migrator.generate klass: "Users::CreateUser", folders: ["db/migrate", "spec/dummy/db/migrate"]
-# => "/db/migrate/users/1_create_user.rb"
+# Suppose the maximum number of migrations in `db/migrate` is "3"
 
-migrator.generate klass: "Users::CreateUser", folders: ["spec/dummy/db/migrate", "db/migrate"]
-# => "/spec/dummy/db/migrate/users/1_create_user.rb"
+migrator.generate klass: "users/create_user"
+# => `db/migrate/users/4_create_user.rb
 ```
+
+You can customize a list of all folders, that contain migrations. Their order is sufficient because new migration will be placed to the first one, while the others are only used to check existing migrations:
+
+```ruby
+# Suppose the maximum number of migrations in `db/migrate` and `spec/dummy/db/migrate` is "4"
+
+migrator.generate klass: "users/create_user", folders: ["db/migrate", "spec/dummy/db/migrate"]
+# => "/db/migrate/users/5_create_user.rb"
+
+migrator.generate klass: "Users::CreateRole", folders: ["spec/dummy/db/migrate", "db/migrate"]
+# => "/spec/dummy/db/migrate/users/6_create_role.rb"
+```
+
+Notice, that a migrator provides nested folders inside the target directory following the namespace of the migration.
 
 Compatibility
 -------------

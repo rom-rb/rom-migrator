@@ -142,17 +142,30 @@ describe ROM::Migrator do
     subject { migrator.generate options }
     before  { allow(generator).to receive(:call) }
 
-    let(:options) { { folders: folders, klass: "Foo::Bar" } }
+    context "with folders" do
+      let(:options) { { folders: folders, klass: "Foo::Bar", number: "3" } }
 
-    it "builds and calls a generator" do
-      expect(generator)
-        .to receive(:call)
-        .with(options.merge(migrator: migrator))
-      subject
+      it "builds and calls a generator" do
+        expect(generator)
+          .to receive(:call)
+          .with(options.merge(migrator: migrator))
+        subject
+      end
+
+      it "returns itself" do
+        expect(subject).to eql migrator
+      end
     end
 
-    it "returns itself" do
-      expect(subject).to eql migrator
+    context "without folders" do
+      let(:options) { { klass: "Foo::Bar", number: "3" } }
+
+      it "builds and calls a generator with default path" do
+        expect(generator)
+          .to receive(:call)
+          .with(options.merge(migrator: migrator, folders: ["db/migrate"]))
+        subject
+      end
     end
   end # describe #generate
 
