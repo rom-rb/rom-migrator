@@ -96,8 +96,8 @@ describe ROM::Migrator do
 
     it { is_expected.to eql migrator }
 
-    context "without logger" do
-      let(:options) { { folders: folders, target: "109" } }
+    context "without options" do
+      subject { migrator.apply }
 
       it "uses default logger" do
         expect(runner).to receive(:apply) do |options|
@@ -126,8 +126,8 @@ describe ROM::Migrator do
       expect(subject).to eql migrator
     end
 
-    context "without logger" do
-      let(:options) { { folders: folders, target: "109" } }
+    context "without options" do
+      subject { migrator.reverse }
 
       it "uses default logger" do
         expect(runner).to receive(:reverse) do |options|

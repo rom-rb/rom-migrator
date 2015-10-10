@@ -22,12 +22,13 @@ end
 
 desc "Runs mutation metric for testing"
 task :mutant do
-  system "mutant -r rom-migrator --use rspec ROM::Migrator* --fail-fast"
+  system "MUTANT=true mutant -r rom-migrator --use rspec ROM::Migrator*" \
+         " --fail-fast"
 end
 
 desc "Exhort all evils"
 task :exhort do
-  system "mutant -r rom-migrator --use rspec ROM::Migrator*"
+  system "MUTANT=true mutant -r rom-migrator --use rspec ROM::Migrator*"
 end
 
 desc "Runs all the necessary metrics before making a commit"

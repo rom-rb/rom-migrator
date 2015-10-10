@@ -18,7 +18,7 @@ class ROM::Migrator
     #
     def initialize(*migrations)
       @migrations = migrations.flatten
-      freeze
+      freeze # shallow because of possible mitability of migrator in migrations
     end
 
     # Iterates through migrations
@@ -36,7 +36,8 @@ class ROM::Migrator
     # @return [self] itself
     #
     def apply
-      sort_by(&:number).each(&:apply) && self
+      sort_by(&:number).each(&:apply)
+      self
     end
 
     # Reverses all migrations
@@ -44,7 +45,8 @@ class ROM::Migrator
     # @return [self] itself
     #
     def reverse
-      sort_by(&:number).reverse_each(&:reverse) && self
+      sort_by(&:number).reverse_each(&:reverse)
+      self
     end
 
   end # class Migrations

@@ -43,17 +43,17 @@ module ROM
   #
   #     # returns numbers of applied migrations
   #     def registered
-  #       gateway.send "SELECT number FROM migrations;"
+  #       call "SELECT number FROM migrations;"
   #     end
   #
   #     # registers new applied migration
   #     def register(number)
-  #       gateway.send "INSERT number '#{number}' INTO migrations;"
+  #       call "INSERT number '#{number}' INTO migrations;"
   #     end
   #
   #     # unregisters a migration being reversed
   #     def unregister(number)
-  #       gateway.send "DELETE FROM migrations WHERE number='#{number}';"
+  #       call "DELETE FROM migrations WHERE number='#{number}';"
   #     end
   #
   #     # other function to be accessible from migration's +#up+ and +#down+
@@ -116,7 +116,7 @@ module ROM
       @gateway      = gateway
       @default_path = self.class.default_path
       @template     = self.class.template
-      prepare_registry
+      prepare_registry # MUST be defined by adapter
     end
 
     # @!method next_migration_number(last_number)
@@ -133,6 +133,18 @@ module ROM
       Time.now.strftime "%Y%m%d%H%M%S%L"
     end
 
+    # Defines and instantiates unnamed migration to be applied/reversed
+    #
+    # @param [Proc] block The migration definition (via +up+ and +down+ methods)
+    # @option options [::Logger] logger
+    #   The custom logger to be used by the migration
+    #
+    # @return [ROM::Migrator::Migration]
+    #
+    def migration(options = {}, &block)
+      Class.new(Migration, &block).new options.merge(migrator: self)
+    end
+
     # Applies migrations
     #
     # @option options [String, nil] :target
@@ -144,37 +156,23 @@ module ROM
     #   The paths to migration folders. The migrator will use either these
     #   ones, or [.default_path], to look for migrations.
     # @option options [::Logger] :logger
-    #   The mutable IO object to log results of migrations
-    #   By default uses an instance of [ROM::Migrator::Logger]
-    #
-    # @return [self] itself
-    #
-    def apply(options)
-      options[:logger] ||= Logger.new
-      Runner.apply options.merge(migrator: self)
-      self
-    end
-
-    # Reverses migrations
-    #
-    # @option options [String] :target
-    #   The target version to migrate. The migrator will reverse all
-    #   registered migrations whose numbers are **greater** than given one.
-    #   When the target is not provided, the migrator will reverse all
-    #   registered (previously applied) migrations.
-    # @option options [Array<String>] :folders
-    #   The paths to migration folders. The migrator will use either these
-    #   ones, or [.default_path], to look for migrations.
-    # @option options [::Logger] :logger
     #   The logger used to log results of migrations.
     #   Default logger sends messages to +$sdtout+.
     #
     # @return [self] itself
     #
-    def reverse(options)
-      options[:logger] ||= Logger.new
-      Runner.reverse options.merge(migrator: self)
-      self
+    def apply(options = {})
+      run :apply, options
+    end
+
+    # Reverses migrations
+    #
+    # @option (see #apply)
+    #
+    # @return [self] itself
+    #
+    def reverse(options = {})
+      run :reverse, options
     end
 
     # Generates the migration
@@ -213,19 +211,13 @@ module ROM
       self
     end
 
-    # Defines and instantiates unnamed migration to be applied/reversed
-    #
-    # @param [Proc] block The migration definition (via +up+ and +down+ methods)
-    # @option options [::Logger] logger
-    #   The custom logger to be used by the migration
-    #
-    # @return [ROM::Migrator::Migration]
-    #
-    def migration(options = {}, &block)
-      Class.new(Migration, &block).new options.merge(migrator: self)
-    end
-
     private
+
+    def run(command, options)
+      opts = { logger: Logger.new }.merge(options).merge(migrator: self)
+      Runner.public_send command, opts
+      self
+    end
 
     def method_missing(*args)
       gateway.public_send(*args)

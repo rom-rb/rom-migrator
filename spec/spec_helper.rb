@@ -19,3 +19,10 @@ require "immutability/rspec"
 require "support/memfs"
 require "shared/custom_template"
 require "shared/migrations"
+
+# This is necessary because some mutations can provide circular dependencies
+if ENV["MUTANT"]
+  RSpec.configure do |config|
+    config.around { |example| Timeout.timeout(0.5, &example) }
+  end
+end
