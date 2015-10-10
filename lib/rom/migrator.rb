@@ -11,9 +11,10 @@ module ROM
 
   require_relative "migrator/logger"          # default logger for migration
   require_relative "migrator/migration"       # changes the persistence
-  require_relative "migrator/migrations"
+  require_relative "migrator/migrations"      # defines the order of migrations
   require_relative "migrator/migration_file"  # file description
-  require_relative "migrator/migration_files" # filterable collection of files
+  require_relative "migrator/migration_files" # filters files by their numbers
+
   require_relative "migrator/runner"          # applies / reverses migrations
   require_relative "migrator/generator"       # scaffolds migrations
 
@@ -141,7 +142,7 @@ module ROM
     #   migrations.
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
-    #   ones, or default path, to look for migrations.
+    #   ones, or [.default_path], to look for migrations.
     # @option options [::Logger] :logger
     #   The mutable IO object to log results of migrations
     #   By default uses an instance of [ROM::Migrator::Logger]
@@ -163,10 +164,10 @@ module ROM
     #   registered (previously applied) migrations.
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
-    #   ones, or default path, to look for migrations.
+    #   ones, or [.default_path], to look for migrations.
     # @option options [::Logger] :logger
-    #   The mutable IO object to log results of migrations
-    #   By default uses an instance of [ROM::Migrator::Logger]
+    #   The logger used to log results of migrations.
+    #   Default logger sends messages to +$sdtout+.
     #
     # @return [self] itself
     #
@@ -193,7 +194,7 @@ module ROM
     #   the target folder.
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
-    #   ones, or default path, to look for the maximum number of
+    #   ones, or [.default_path], to look for the maximum number of
     #   existing migrations.
     #   The order of folders is sufficient, because the generated migration
     #   will be placed to the **first** folder.
@@ -209,19 +210,19 @@ module ROM
     def generate(options)
       opts = { folders: [default_path] }.merge(options).merge(migrator: self)
       Generator.call(opts)
-
       self
     end
 
     # Defines and instantiates unnamed migration to be applied/reversed
     #
     # @param [Proc] block The migration definition (via +up+ and +down+ methods)
+    # @option options [::Logger] logger
+    #   The custom logger to be used by the migration
     #
     # @return [ROM::Migrator::Migration]
     #
     def migration(options = {}, &block)
-      logger = options.fetch(:logger) {}
-      Class.new(Migration, &block).new(migrator: self, logger: logger)
+      Class.new(Migration, &block).new options.merge(migrator: self)
     end
 
     private

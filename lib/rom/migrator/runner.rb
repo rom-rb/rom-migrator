@@ -42,8 +42,6 @@ class ROM::Migrator
 
     # Applies all migrations in the collection
     #
-    # @param [::Logger] logger
-    #
     # @return [undefined]
     #
     def apply
@@ -56,8 +54,6 @@ class ROM::Migrator
     end
 
     # Reverses all migrations in the collection
-    #
-    # @param [::Logger] logger
     #
     # @return [undefined]
     #

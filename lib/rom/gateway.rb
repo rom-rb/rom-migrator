@@ -21,6 +21,12 @@ module ROM
       raise MigratorNotPresentError.new(adapter)
     end
 
+    # The exception to be raised when adapter-specific gateway tries to use
+    # a migrator in case the adapter doesn't include it.
+    #
+    # @example
+    #   MigratorNotPresentError.new :custom_adapter
+    #
     class MigratorNotPresentError < NameError
       include Immutability
 

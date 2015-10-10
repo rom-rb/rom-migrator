@@ -35,6 +35,9 @@ class ROM::Migrator
     # Builds the collection of migration files from a list of folders
     #
     # @param [String, Array<String>, nil] folders
+    #
+    # @return [ROM::Migrator::MigrationFiles]
+    #
     def self.from(*folders)
       files = folders.flatten.map do |root|
         paths = Dir[File.join(root, "**/*.rb")]
