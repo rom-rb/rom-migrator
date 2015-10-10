@@ -1,34 +1,35 @@
-# # encoding: utf-8
+# encoding: utf-8
+describe ROM::Migrator::MigrationFiles do
 
-describe ROM::Migrator::MigrationFiles, :memfs do
-  include_context :migrations
+  let(:files) { described_class.new foo, [bar, baz] }
 
-  let(:files) { described_class.new(folders) }
-  let(:not_found_error) { ROM::Migrator::Errors::NotFoundError }
+  let(:foo) { frozen_double :file, number: "foo", to_migration: double }
+  let(:bar) { frozen_double :file, number: "bar", to_migration: double }
+  let(:baz) { frozen_double :file, number: "baz", to_migration: double }
 
-  describe "#folders" do
-    subject { files.folders }
+  describe ".from", :memfs do
+    include_context :migrations
+    subject { described_class.from folders }
 
-    it { is_expected.to eql folders }
-  end # describe #folders
+    it "creates the collection with all files in given folders" do
+      expect(subject).to be_kind_of described_class
+      expect(subject.map(&:number)).to contain_exactly("1", "2", "3")
+    end
+  end # describe .from
+
+  describe ".new" do
+    subject { files }
+
+    it { is_expected.to be_immutable }
+  end # describe .new
 
   describe "#each" do
-    context "with no block given" do
-      subject { files.each }
+    subject { files.each }
 
-      it { is_expected.to be_kind_of Enumerator }
-    end
+    it { is_expected.to be_kind_of Enumerator }
 
-    context "with a block" do
-      subject { files.map { |f| [f.number, f.klass, f.path] } }
-
-      it "iterates via ordered collection of files" do
-        expect(subject).to eql [
-          ["1", "CreateUsers", "/db/migrate/1_create_users.rb"],
-          ["2", "CreateRoles", "/spec/dummy/db/migrate/2_create_roles.rb"],
-          ["3", "CreateAccounts", "/db/migrate/3_create_accounts.rb"]
-        ]
-      end
+    it "iterates through files" do
+      expect(subject.map(&:number)).to contain_exactly("bar", "baz", "foo")
     end
   end # describe #each
 
@@ -36,43 +37,27 @@ describe ROM::Migrator::MigrationFiles, :memfs do
     context "empty" do
       subject { files.with_numbers }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w()
-      end
+      it { is_expected.to collect_files_with_numbers %w() }
     end
 
     context "one number" do
-      subject { files.with_numbers("1") }
+      subject { files.with_numbers("baz") }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w(1)
-      end
+      it { is_expected.to collect_files_with_numbers %w(baz) }
     end
 
     context "list of numbers" do
-      subject { files.with_numbers("1", ["2"]) }
+      subject { files.with_numbers("baz", ["bar"], nil) }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w(1 2)
-      end
+      it { is_expected.to collect_files_with_numbers %w(bar baz) }
     end
 
     context "absent number" do
-      subject { files.with_numbers("4") }
+      subject { files.with_numbers("qux") }
 
       it "fails" do
-        expect { subject }.to raise_error do |error|
-          expect(error).to be_kind_of not_found_error
-          expect(error.message).to include "'4'"
-          expect(error.message).to include "/db/migrate"
-          expect(error.message).to include "/spec/dummy/db/migrate"
-        end
+        expect { subject }
+          .to raise_error ROM::Migrator::Errors::NotFoundError, /qux/
       end
     end
   end # describe #with_numbers
@@ -85,45 +70,29 @@ describe ROM::Migrator::MigrationFiles, :memfs do
     end
 
     context "one number" do
-      subject { files.after_numbers("1") }
+      subject { files.after_numbers("bar") }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w(2 3)
-      end
+      it { is_expected.to collect_files_with_numbers %w(baz foo) }
     end
 
     context "list of numbers" do
-      subject { files.after_numbers("0", ["1"]) }
+      subject { files.after_numbers("bar", ["baz"], nil) }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w(2 3)
-      end
+      it { is_expected.to collect_files_with_numbers %w(foo) }
     end
 
     context "absent number" do
-      subject { files.after_numbers("4") }
+      subject { files.after_numbers("elf") }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w()
-      end
+      it { is_expected.to collect_files_with_numbers %w(foo) }
     end
   end # describe #after_numbers
 
   describe "#upto_number" do
     context "with value" do
-      subject { files.upto_number("2") }
+      subject { files.upto_number("baz") }
 
-      it "returns updated collection" do
-        expect(subject).not_to eql files
-        expect(subject).to be_kind_of described_class
-        expect(subject.map(&:number)).to eql %w(1 2)
-      end
+      it { is_expected.to collect_files_with_numbers %w(bar baz) }
     end
 
     context "without value" do
@@ -136,13 +105,37 @@ describe ROM::Migrator::MigrationFiles, :memfs do
   describe "#last_number" do
     subject { files.last_number }
 
-    it { is_expected.to eql "3" }
+    it { is_expected.to eql "foo" }
 
     context "when files are absent" do
       let(:files) { described_class.new }
 
       it { is_expected.to eql "" }
     end
-  end # describe #after_numbers
+  end # describe #last_number
+
+  describe "#to_migrations" do
+    subject { files.to_migrations(options) }
+    let(:options) { { migrator: double, logger: double } }
+
+    it "converts all files to migrations" do
+      [foo, bar, baz].each do |file|
+        expect(file).to receive(:to_migration).with(options).once
+      end
+      subject
+    end
+
+    it "returns the collection of migrations" do
+      expect(subject).to be_kind_of ROM::Migrator::Migrations
+      expect(subject.to_a).to match_array [foo, bar, baz].map(&:to_migration)
+    end
+  end # describe #to_migrations
+
+  RSpec::Matchers.define :collect_files_with_numbers do |nums|
+    match do |actual|
+      expect(actual).to be_kind_of described_class
+      expect(actual.map(&:number)).to match_array nums
+    end
+  end # matcher collect_files_with_numbers
 
 end # describe ROM::Migrator::MigrationFiles

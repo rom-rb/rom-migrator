@@ -8,14 +8,14 @@ module ROM::Migrator::Errors
   #
   class NotFoundError < ::IOError
 
+    include Immutability
+
     # Initializes the exception for the wrong number
     #
     # @param [#to_s] number The number of migration
-    # @param [Array<#to_s>] folders The list of folders to look for migration
     #
-    def initialize(number, *folders)
-      list = folders.map { |folder| "\n- '#{folder}'" }.join(",")
-      super "migration number '#{number}' wasn't found in folders:#{list}"
+    def initialize(number)
+      super "Cannot find migration with number '#{number}'"
     end
 
   end # class NotFoundError

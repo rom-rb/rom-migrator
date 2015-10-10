@@ -1,23 +1,22 @@
-# # encoding: utf-8
-
+# encoding: utf-8
 describe ROM::Migrator::MigrationFile do
 
   let(:klass)      { Class.new(described_class) }
   let(:name_error) { described_class::MigrationNameError }
-  let(:migrator)   { double :migrator }
 
-  let(:fn) { klass.new folder: "/foo", path: "/foo/bar_baz/n_baz_qux.rb" }
-  let(:kn) { klass.new folder: "/foo", klass: "BarBaz::BazQux", number: "n" }
+  let(:fn) { klass.new root: "/foo", path: "/foo/bar_baz/n_baz_qux.rb" }
+  let(:kn) { klass.new root: "/foo", klass: "BarBaz::BazQux", number: "n" }
 
   describe ".new" do
     context "with valid arguments" do
       subject { fn }
 
       it { is_expected.to be_kind_of described_class }
+      it { is_expected.to be_immutable }
     end
 
     context "with wrong filename" do
-      subject { klass.new folder: "/foo", path: "/foo/baz-qux.rb" }
+      subject { klass.new root: "/foo", path: "/foo/baz-qux.rb" }
 
       it "fails" do
         expect { subject }.to raise_error do |error|
@@ -28,7 +27,7 @@ describe ROM::Migrator::MigrationFile do
     end
 
     context "with wrong name" do
-      subject { klass.new folder: "/foo", klass: "", number: "n" }
+      subject { klass.new root: "/foo", klass: "", number: "n" }
 
       it "fails" do
         expect { subject }.to raise_error do |error|
@@ -39,7 +38,7 @@ describe ROM::Migrator::MigrationFile do
     end
 
     context "with wrong number" do
-      subject { klass.new folder: "/foo", klass: "Foo::Bar", number: "" }
+      subject { klass.new root: "/foo", klass: "Foo::Bar", number: "" }
 
       it "fails" do
         expect { subject }.to raise_error do |error|
@@ -50,7 +49,7 @@ describe ROM::Migrator::MigrationFile do
     end
 
     context "without number" do
-      subject { klass.new folder: "/foo", klass: "Foo::Bar" }
+      subject { klass.new root: "/foo", klass: "Foo::Bar" }
 
       it "fails" do
         expect { subject }.to raise_error do |error|
@@ -60,6 +59,12 @@ describe ROM::Migrator::MigrationFile do
       end
     end
   end # describe .new
+
+  describe "#root" do
+    subject { fn.root }
+
+    it { is_expected.to eql "/foo" }
+  end # describe #root
 
   describe "#number" do
     subject { file.number }
@@ -109,20 +114,25 @@ describe ROM::Migrator::MigrationFile do
     end
   end # describe #path
 
-  describe "#build_migration", :memfs do
-    subject { file.build_migration migrator }
-
+  describe "#to_migration", :memfs do
     include_context :migrations
-    let(:file) { klass.new(folder: "/db/migrate", path: path) }
-    let(:path) { "/db/migrate/1_create_users.rb" }
+    subject { file.to_migration migrator: migrator, logger: logger }
 
-    it "builds a migration" do
-      expect(subject).to be_kind_of CreateUsers
+    let(:migrator) { double :migrator }
+    let(:logger)   { double :logger }
+    let(:file) do
+      klass.new root: "/db/migrate", path: "/db/migrate/1_create_users.rb"
+    end
+
+    it "builds the migration" do
+      expect(subject).to be_kind_of   CreateUsers
+      expect(subject.number).to eql   "1"
       expect(subject.migrator).to eql migrator
-      expect(subject.number).to eql "1"
+      expect(subject.logger).to eql   logger
     end
 
     after { Object.send :remove_const, :CreateUsers }
-  end # describe #build_migration
+
+  end # describe #to_migration
 
 end # describe ROM::Migrator::MigrationFile

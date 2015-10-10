@@ -1,5 +1,6 @@
 # encoding: utf-8
 
+require "immutability"
 require "logger"
 require "rom"
 
@@ -10,9 +11,10 @@ module ROM
 
   require_relative "migrator/logger"          # default logger for migration
   require_relative "migrator/migration"       # changes the persistence
+  require_relative "migrator/migrations"
   require_relative "migrator/migration_file"  # file description
   require_relative "migrator/migration_files" # filterable collection of files
-  require_relative "migrator/runner"          # applies / rolls back migrations
+  require_relative "migrator/runner"          # applies / reverses migrations
   require_relative "migrator/generator"       # scaffolds migrations
 
   # The abstract base class for ROM migrators
@@ -20,7 +22,7 @@ module ROM
   # The migrator stores all adapter-specific settings
   # and defines APIwith 3 instance methods to:
   # - [#apply] migrations
-  # - [#rollback] migrations
+  # - [#reverse] migrations
   # - [#generate] the next migration
   #
   # @example
@@ -48,7 +50,7 @@ module ROM
   #       gateway.send "INSERT number '#{number}' INTO migrations;"
   #     end
   #
-  #     # unregisters a migration being rolled back
+  #     # unregisters a migration being reversed
   #     def unregister(number)
   #       gateway.send "DELETE FROM migrations WHERE number='#{number}';"
   #     end
@@ -152,12 +154,12 @@ module ROM
       self
     end
 
-    # Rolls back migrations
+    # Reverses migrations
     #
     # @option options [String] :target
-    #   The target version to migrate. The migrator will roll back all
+    #   The target version to migrate. The migrator will reverse all
     #   registered migrations whose numbers are **greater** than given one.
-    #   When the target is not provided, the migrator will roll back all
+    #   When the target is not provided, the migrator will reverse all
     #   registered (previously applied) migrations.
     # @option options [Array<String>] :folders
     #   The paths to migration folders. The migrator will use either these
@@ -168,9 +170,9 @@ module ROM
     #
     # @return [self] itself
     #
-    def rollback(options)
+    def reverse(options)
       options[:logger] ||= Logger.new
-      Runner.rollback options.merge(migrator: self)
+      Runner.reverse options.merge(migrator: self)
       self
     end
 
@@ -209,6 +211,27 @@ module ROM
       Generator.call(opts)
 
       self
+    end
+
+    # Defines and instantiates unnamed migration to be applied/reversed
+    #
+    # @param [Proc] block The migration definition (via +up+ and +down+ methods)
+    #
+    # @return [ROM::Migrator::Migration]
+    #
+    def migration(options = {}, &block)
+      logger = options.fetch(:logger) {}
+      Class.new(Migration, &block).new(migrator: self, logger: logger)
+    end
+
+    private
+
+    def method_missing(*args)
+      gateway.public_send(*args)
+    end
+
+    def respond_to_missing?(name, *)
+      gateway.respond_to? name
     end
 
   end # class Migrator

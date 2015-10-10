@@ -7,6 +7,7 @@ describe ROM::Migrator::Errors::MigrationNameError do
     subject { error }
 
     it { is_expected.to be_kind_of ::NameError }
+    it { is_expected.to be_immutable }
   end # describe .new
 
   describe "#message" do

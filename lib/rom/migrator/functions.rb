@@ -12,7 +12,7 @@ class ROM::Migrator
     extend Transproc::Registry
     import :camelize,    from: ROM::Inflector, as: :up
     import :underscore,  from: ROM::Inflector, as: :down
-    import :constantize, from: ROM::Inflector
+    import :constantize, from: ROM::Inflector, as: :klass
 
     # Regex to split path by parts
     SPLITTER = %r{^(?:(.+)(?:\/))?([^_\/]+)(?:_)([^.\/]+)(?:\.rb)$}
@@ -56,21 +56,6 @@ class ROM::Migrator
       name, number = parts.flatten
       names = fetch(:down)[name.to_s].split("/")
       names.push("#{number}_#{names.pop}.rb").join("/")
-    end
-
-    # Converts input array into flat compact ordered one
-    #
-    # @example
-    #   fn = ROM::Migrator::Functions[:clean_array]
-    #
-    #   fn[["3", [nil, "2"], "1"]] # => ["1", "2", "3"]
-    #
-    # @param [Array] array
-    #
-    # @return [Array] array
-    #
-    def self.clean_array(array)
-      array.flatten.compact.sort
     end
 
     # @private

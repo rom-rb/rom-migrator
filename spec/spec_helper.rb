@@ -13,6 +13,7 @@ require "rom-migrator"
 
 # Loads gems-specific shared examples
 require "transproc/rspec"
+require "immutability/rspec"
 
 # Loads some helpers and shared contexts
 require "support/memfs"

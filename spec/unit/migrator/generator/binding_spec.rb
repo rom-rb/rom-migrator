@@ -1,7 +1,5 @@
 # encoding: utf-8
-
 describe ROM::Migrator::Generator::Binding do
-  let(:binding) { described_class.new klass }
   let(:klass)   { "Foo::Bar" }
   let(:adapter) { :custom_adapter }
 
@@ -9,6 +7,8 @@ describe ROM::Migrator::Generator::Binding do
     subject { described_class[klass] }
 
     it { is_expected.to be_kind_of ::Binding }
+
+    it { is_expected.to be_immutable }
 
     it "carries @klass" do
       expect(eval("@klass", subject)).to eql klass

@@ -62,12 +62,11 @@ class ROM::Migrator
     end
 
     def file
-      MigrationFile.new folder: folders.first, klass: klass, number: number
+      MigrationFile.new root: folders.first, klass: klass, number: number
     end
 
     def last_number
-      last_migration = MigrationFiles.new(folders).to_a.last
-      last_migration.number if last_migration
+      MigrationFiles.from(folders).last_number
     end
 
     def content

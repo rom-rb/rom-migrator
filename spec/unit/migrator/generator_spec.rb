@@ -1,5 +1,4 @@
-# # encoding: utf-8
-
+# encoding: utf-8
 describe ROM::Migrator::Generator do
 
   let(:generator) { described_class.new options }

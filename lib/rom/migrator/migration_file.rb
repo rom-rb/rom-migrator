@@ -2,86 +2,91 @@
 
 class ROM::Migrator
 
-  # Describes the migration file and loads it when necessary
+  # Describes the migration file
   #
-  # It defines connection between [#path], [#klass] and [#number] and
-  # knows how to [#load] a corresponding migration.
+  # Knows how to convert [#path] inside a [#root] folder
+  # to [#klass] and [#number] of migration. Alternatively
+  # converts [#klass] and [#number] to [#path] in a [#root].
   #
-  # @example from path
-  #   file = MigrationFile.new(
-  #     folder: "/foo_bar",
-  #     path: "/foo_bar/bar_baz/num123_baz_qux.rb"
-  #   )
-  #   file.path   # => "/foo_bar/bar_baz/num123_baz_qux.rb"
-  #   file.number # => "num123"
-  #   file.klass  # => "BarBaz::BazQux"
+  # Eventually it instantiates the migration for a specific migrator and logger,
+  # using [#to_migration] method.
   #
-  # Alternatively, file can be built with a number and a name, provided by user.
+  # @example Instantiates the migration described in a file by [#path]
+  #   MigrationFile.new(
+  #     root: "/my_gem/db/migrate",
+  #     path: "/my_gem/db/migrate/my_gem/20170101120342822_create_users.rb"
+  #   ).to_migration
+  #   # => <MyGem::CreateUsers @number="20170101120342822">
   #
-  # @example from class name and number
-  #   file = MigrationFile.new
-  #     folder: "/foo_bar",
-  #     klass:  "BarBaz::BazQux",
-  #     number: "num"
-  #   )
-  #   file.path   # => "/foo_bar/bar_baz/num123_baz_qux.rb"
-  #   file.number # => "num123"
-  #   file.klass  # => "BarBaz::BazQux"
+  # @example Defines the path to store migration with [#klass] and [#number]
+  #   MigrationFile.new(
+  #     root:   "/my_gem/db/migrate",
+  #     klass:  "MyGem/CreateRoles",
+  #     number: "20170101120419238"
+  #   ).path
+  #   # => "/my_gem/db/migrate/my_gem/20170101120419238_create_roles.rb"
   #
   # @author nepalez <andrew.kozin@gmail.com>
   #
   class MigrationFile
 
-    include ROM::Options
-    include Errors
+    include ROM::Options, Errors, Immutability
 
-    option :folder, reader: true, type: String, required: true
+    option :root,   reader: true, type: String, required: true
     option :klass,  reader: true
     option :number, reader: true
     option :path,   reader: true
 
-    # Pure functions
-    PARTS = Functions[:path_to_parts]
-    PATH  = Functions[:parts_to_path]
-    CLASS = Functions[:constantize]
-
     # @!method initialize(options)
     # Initializes the file description instance
     #
-    # @option options [#to_s] :folder The full path to the migrations folder
+    # @option options [#to_s] :root   The full path to migrations root folder
+    # @option options [#to_s] :path   The full path to migration file
     # @option options [#to_s] :klass  The class name of the migration
     # @option options [#to_s] :number The number of the migration
-    # @option options [#to_s] :path   The full path to migration
     #
-    def initialize(*)
-      super
+    def initialize(options)
+      super(options)
       path ? initialize_from_path : initialize_from_klass_and_number
-      fail MigrationNameError.new(path) unless valid_klass? && valid_number?
+      validate_file
     end
 
-    # Loads the file and builds the corresponding migration
+    # Loads the file and initializes the migration it describes
     #
-    # @param [ROM::Migrator] migrator
+    # @param [Hash] options
+    # @option options [ROM::Migrator] migrator
+    #   The migrator that provides access to persistence for migration
+    # @option options [::Logger] logger
+    #   The custom logger to report migration's result
     #
     # @return [ROM::Migrator::Migration]
     #
-    def build_migration(migrator)
+    def to_migration(options)
       require path
-      CLASS[klass].new(migrator: migrator, number: number)
+      constant.new options.merge(number: number)
     end
 
     private
+
+    KLASS = Functions[:klass]
+    PARTS = Functions[:path_to_parts]
+    PATH  = Functions[:parts_to_path]
 
     def initialize_from_path
       @klass, @number = PARTS[relative_path]
     end
 
     def initialize_from_klass_and_number
-      @path = File.join(folder, PATH[klass, number])
+      @path = File.join(root, PATH[klass, number])
     end
 
     def relative_path
-      Pathname.new(path).relative_path_from(Pathname.new(folder)).to_s
+      Pathname.new(path).relative_path_from(Pathname.new(root)).to_s
+    end
+
+    def validate_file
+      return if valid_klass? && valid_number?
+      fail MigrationNameError.new(path)
     end
 
     def valid_klass?
@@ -89,7 +94,12 @@ class ROM::Migrator
     end
 
     def valid_number?
-      number && !number.empty?
+      @number = @number.to_s
+      !number.empty?
+    end
+
+    def constant
+      KLASS[klass]
     end
 
   end # class MigrationFile

@@ -10,8 +10,11 @@ shared_context :custom_template do
 
     File.new(template, "w").write <<-TEXT.gsub(/ *\|/, "")
       |class <%= @klass %> < ROM::Migrator::Migration
-      |  def up; end
-      |  def down; end
+      |  up do
+      |  end
+      |
+      |  down do
+      |  end
       |end
     TEXT
   end

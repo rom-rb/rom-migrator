@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 describe ROM::Migrator::Functions do
 
   describe ".path_to_parts" do
@@ -58,14 +57,5 @@ describe ROM::Migrator::Functions do
       let(:output) { [nil, nil, nil] }
     end
   end # describe .split_path
-
-  describe ".clean_array" do
-    let(:arguments) { [:clean_array] }
-
-    it_behaves_like :transforming_immutable_data do
-      let(:input)  { [3, [2, nil], nil, 1] }
-      let(:output) { [1, 2, 3] }
-    end
-  end # describe .clean_array
 
 end # describe ROM::Migrator::Functions

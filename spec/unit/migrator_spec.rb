@@ -9,7 +9,7 @@ describe ROM::Migrator do
   let(:runner)    { ROM::Migrator::Runner }
   let(:generator) { ROM::Migrator::Generator }
   let(:migrator)  { klass.new gateway }
-  let(:gateway)   { double :gateway }
+  let(:gateway)   { double :gateway, foo: :qux }
   let(:folders)   { ["db/migrate", "spec/dummy/db/migrate"] }
 
   describe ".default_path" do
@@ -108,16 +108,16 @@ describe ROM::Migrator do
     end
   end # describe #apply
 
-  describe "#rollback" do
-    subject { migrator.rollback options }
-    before  { allow(runner).to receive(:rollback) }
+  describe "#reverse" do
+    subject { migrator.reverse options }
+    before  { allow(runner).to receive(:reverse) }
 
     let(:options) { { folders: folders, target: "109", logger: logger } }
     let(:logger)  { double :logger }
 
-    it "builds and rolls back runner" do
+    it "builds and reverses runner" do
       expect(runner)
-        .to receive(:rollback)
+        .to receive(:reverse)
         .with(options.merge(migrator: migrator))
       subject
     end
@@ -130,13 +130,13 @@ describe ROM::Migrator do
       let(:options) { { folders: folders, target: "109" } }
 
       it "uses default logger" do
-        expect(runner).to receive(:rollback) do |options|
+        expect(runner).to receive(:reverse) do |options|
           expect(options[:logger]).to be_kind_of ROM::Migrator::Logger
         end
         subject
       end
     end
-  end # describe #rollback
+  end # describe #reverse
 
   describe "#generate" do
     subject { migrator.generate options }
@@ -168,5 +168,62 @@ describe ROM::Migrator do
       end
     end
   end # describe #generate
+
+  describe "#migration" do
+    subject { migrator.migration(logger: logger) { up { :foo } } }
+
+    let(:logger) { double :logger }
+
+    it "provides custom migration" do
+      expect(subject).to be_kind_of ROM::Migrator::Migration
+      expect(subject.class.up.call).to eql :foo
+    end
+
+    it "uses logger" do
+      expect(subject.logger).to eql logger
+    end
+
+    it "uses current migrator" do
+      expect(subject.migrator).to eql migrator
+    end
+
+    it "doesn't set the migration number" do
+      expect(subject.number).to be_nil
+    end
+
+    context "without logger" do
+      subject { migrator.migration { up { :foo } } }
+
+      it "still works" do
+        expect(subject).to be_kind_of ROM::Migrator::Migration
+        expect(subject.class.up.call).to eql :foo
+      end
+    end
+  end # describe #migration
+
+  describe "#method_missing" do
+    subject { migrator.foo :bar, :baz }
+
+    it "forwards unknown methods to #gateway" do
+      expect(gateway).to receive(:foo).with(:bar, :baz)
+      expect(subject).to eql :qux
+    end
+  end # describe #method_missing
+
+  describe "#respond_to_missing?" do
+    subject { migrator.respond_to? name }
+
+    context "method known to #gateway" do
+      let(:name) { :foo }
+
+      it { is_expected.to eql true }
+    end
+
+    context "method unknown to #gaeway" do
+      let(:name) { :quxx }
+
+      it { is_expected.to eql false }
+    end
+  end # describe #respond_to?
 
 end # describe ROM::Migrator

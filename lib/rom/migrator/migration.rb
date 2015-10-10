@@ -2,10 +2,22 @@
 
 class ROM::Migrator
 
-  # Base class for migrations that make changes to persistence
+  # Base class for migrations
   #
   # @example
-  #   migration = ROM::Migrator::Migration.new number: "1", migrator: migrator
+  #   class CreateUsers < ROM::Migrator::Migration
+  #     up do
+  #       create_table(:users).add(name: :text, age: :int)
+  #     end
+  #
+  #     down do
+  #       drop_table(:users)
+  #     end
+  #   end
+  #
+  #   migration = CreateUsers.new(migrator) # using some migrator
+  #   migration.apply
+  #   migration.reverse
   #
   # @api public
   #
@@ -17,66 +29,115 @@ class ROM::Migrator
 
     include ROM::Options
 
-    option :migrator, reader: true
     option :number,   reader: true
+    option :migrator, reader: true, required: true
+    option :logger,   reader: true
 
-    # Applies the migration and then registers in in the gateway
-    #
-    # @param [::Logger] logger
-    #
-    # @return [undefined]
-    #
-    def apply(logger)
-      up
-      register number
-      logger.info "Migration number '#{number}' has been applied"
-    rescue => error
-      logger.error "An error occured while applying" \
-                   " migration number '#{number}':\n#{error}"
-      raise
-    end
-
-    # Rolls back the migration and unregisters it the gateway
-    #
-    # @param [::Logger] logger
-    #
-    # @return [undefined]
-    #
-    def rollback(logger)
-      down
-      unregister number
-      logger.info "Migration number '#{number}' has been rolled back"
-    rescue => error
-      logger.error "An error occured while rolling back" \
-                   " migration number '#{number}':\n#{error}"
-      raise
-    end
-
-    # Applies the migration
+    # Gets or sets the block to be called when the migration is applied
     #
     # @abstract
     #
-    # @return [undefined]
+    # @return [Proc]
     #
-    def up; end
+    def self.up(&block)
+      block ? (@up = block) : @up
+    end
 
-    # Rolls back the migration
+    # Gets or sets the block to be called when the migration is reversed
     #
     # @abstract
     #
-    # @return [undefined]
+    # @return [Proc]
     #
-    def down; end
+    def self.down(&block)
+      block ? (@down = block) : @down
+    end
+
+    # @!method initialize(options)
+    # Initializes the migration for some migrator
+    #
+    # The migrator provides custom methods to make changes to persistence.
+    # Because it calls <potentially> stateful connection
+    # (migration --> migrator --> generator --> connection),
+    # a mutex is used for thread safety.
+    #
+    # When migration is initialized with a number, its appying and reversing
+    # is registered to persistence. Otherwise it just changes the
+    # persistence without any possibility to step back.
+    #
+    # @param [Hash] options
+    # @option options [ROM::Migrator] :migrator
+    #   Required migrator that provides access to persistence.
+    # @option options [#to_s] :number
+    #   Optional number of the migration.
+    # @option options [::Logger] :logger
+    #   Custom logger to which the migration reports its results
+    #
+    def initialize(_)
+      super
+      @up       = self.class.up
+      @down     = self.class.down
+      @logger ||= Logger.new
+      @mutex    = Mutex.new
+      freeze
+    end
+
+    # Applies the migration to persistence
+    #
+    # If the [#number] was provided, then registers it in the persistence
+    #
+    # @return [self] itself
+    #
+    def apply
+      run_threadsafe_and_log_as :applied do
+        instance_eval(&@up)
+        register(number) if number
+      end
+    end
+
+    # Reverses the migration in persistence
+    #
+    # If the [#number] wasn't provided, then unregisters its in the persistence
+    #
+    # @return [self] itself
+    #
+    def reverse
+      run_threadsafe_and_log_as :reversed do
+        instance_eval(&@down)
+        unregister(number) if number
+      end
+    end
+
+    # Describes the migration
+    #
+    # @return [String]
+    #
+    def to_s
+      number ? "migration number '#{number}'" : "migration"
+    end
 
     private
 
-    # Migrator should provide methods to access persistence
+    # All methods, used by [.up] and [.down], are forwarded to the migrator
     def method_missing(*args)
-      migrator.public_send(*args)
+      @migrator.public_send(*args)
     end
 
     def respond_to_missing?(*args)
-      migrator.respond_to?(*args)
+      @migrator.respond_to?(*args)
+    end
+
+    def run_threadsafe_and_log_as(done, &block)
+      @mutex.synchronize { run_and_log_as(done, &block) }
+      self
+    end
+
+    def run_and_log_as(done)
+      yield
+      logger.info "The #{self} has been #{done}"
+    rescue => error
+      logger.error "The error occured when #{self} was #{done}:\n#{error}"
+      raise
     end
 
   end # class Migration

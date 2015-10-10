@@ -1,18 +1,18 @@
 # encoding: utf-8
 
-# <Describe what the migration changes in persistence>
-class <%= @klass %> < ROM::Migration
+# Describe what the migration changes in a persistence
+class <%= @klass %> < ROM::Migrator::Migration
   # Applies the migration
   #
   # @return [undefined]
   #
-  def up
+  up do
   end
 
-  # Rolls back the migration
+  # Reverses the migration
   #
   # @return [undefined]
   #
-  def down
+  down do
   end
 end # class <%= @klass %>

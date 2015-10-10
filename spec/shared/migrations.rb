@@ -16,11 +16,11 @@ shared_context :migrations do
       .new("db/migrate/1_create_users.rb", "w")
       .write <<-TEXT.gsub(/ *\|/, "")
         |class CreateUsers < ROM::Migrator::Migration
-        |  def up
+        |  up do
         |    go "CREATE TABLE users;"
         |  end
         |
-        |  def down
+        |  down do
         |    go "DROP TABLE users;"
         |  end
         |end
@@ -30,11 +30,11 @@ shared_context :migrations do
       .new("spec/dummy/db/migrate/2_create_roles.rb", "w")
       .write <<-TEXT.gsub(/ *\|/, "")
         |class CreateRoles < ROM::Migrator::Migration
-        |  def up
+        |  up do
         |    go "CREATE TABLE roles;"
         |  end
         |
-        |  def down
+        |  down do
         |    go "DROP TABLE roles;"
         |  end
         |end
@@ -44,11 +44,11 @@ shared_context :migrations do
       .new("db/migrate/3_create_accounts.rb", "w")
       .write <<-TEXT.gsub(/ *\|/, "")
         |class CreateAccounts < ROM::Migrator::Migration
-        |  def up
+        |  up do
         |    go "CREATE TABLE accounts;"
         |  end
         |
-        |  def down
+        |  down do
         |    go "DROP TABLE accounts;"
         |  end
         |end

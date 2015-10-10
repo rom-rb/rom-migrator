@@ -1,17 +1,20 @@
-# # encoding: utf-8
-
+# encoding: utf-8
 describe ROM::Migrator::Runner do
 
   let(:runner)     { described_class.new options }
-  let(:options)    { { migrator: migrator, folders: folders, target: target } }
   let(:folders)    { ["db/migrate", "spec/dummy/db/migrate"] }
   let(:target)     { "2" }
   let(:registered) { [] }
-  let(:logger)     { double :logger, info: nil, error: nil }
+  let(:logger)     { ::Logger.new(StringIO.new) }
+
   let(:migrator) do
     double(
       :migrator, go: nil, register: nil, unregister: nil, registered: registered
     )
+  end
+
+  let(:options) do
+    { migrator: migrator, folders: folders, target: target, logger: logger }
   end
 
   describe ".new" do
@@ -21,7 +24,7 @@ describe ROM::Migrator::Runner do
   end # describe .new
 
   describe ".apply" do
-    after { described_class.apply(options.merge(logger: logger)) }
+    after { described_class.apply(options) }
 
     let(:runner) { double :runner, apply: nil }
 
@@ -29,22 +32,22 @@ describe ROM::Migrator::Runner do
       allow(described_class).to receive(:new) { runner }
 
       expect(described_class).to receive(:new).with options
-      expect(runner).to receive(:apply).with logger
+      expect(runner).to receive(:apply)
     end
   end # describe .apply
 
-  describe ".rollback" do
-    after { described_class.rollback(options.merge(logger: logger)) }
+  describe ".reverse" do
+    after { described_class.reverse(options) }
 
-    let(:runner) { double :runner, rollback: nil }
+    let(:runner) { double :runner, reverse: nil }
 
-    it "instantiates the runner and rollbacks migrations" do
+    it "instantiates the runner and reverses migrations" do
       allow(described_class).to receive(:new) { runner }
 
       expect(described_class).to receive(:new).with options
-      expect(runner).to receive(:rollback).with logger
+      expect(runner).to receive(:reverse)
     end
-  end # describe .rollback
+  end # describe .reverse
 
   describe "#options" do
     subject { runner.options }
@@ -70,19 +73,14 @@ describe ROM::Migrator::Runner do
     it { is_expected.to eql target }
   end # describe #target
 
-  describe "#files", :memfs do
-    subject { runner.files }
+  describe "#logger" do
+    subject { runner.logger }
 
-    include_context :migrations
-
-    it "returns files collection" do
-      expect(subject).to be_kind_of ROM::Migrator::MigrationFiles
-      expect(subject.map(&:number)).to eql %w(1 2 3)
-    end
-  end # describe #files
+    it { is_expected.to eql logger }
+  end # describe #logger
 
   describe "#apply", :memfs do
-    subject { runner.apply(logger) }
+    subject { runner.apply }
     include_context :migrations
 
     context "without target" do
@@ -107,21 +105,31 @@ describe ROM::Migrator::Runner do
         expect(migrator).not_to receive(:go).with("CREATE TABLE accounts;")
         subject
       end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).twice
+        subject
+      end
     end
   end # describe #apply
 
-  describe "#rollback", :memfs do
-    subject { runner.rollback(logger) }
+  describe "#reverse", :memfs do
+    subject { runner.reverse }
     include_context :migrations
 
     context "without target" do
       let(:target)     { nil }
       let(:registered) { %w(1 2) }
 
-      it "rolls back all registered migrations" do
+      it "reverses all registered migrations" do
         expect(migrator).not_to receive(:go).with "DROP TABLE accounts;"
         expect(migrator).to receive(:go).with("DROP TABLE roles;").ordered
         expect(migrator).to receive(:go).with("DROP TABLE users;").ordered
+        subject
+      end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).twice
         subject
       end
     end
@@ -130,13 +138,18 @@ describe ROM::Migrator::Runner do
       let(:target)     { "1" }
       let(:registered) { %w(1 3) }
 
-      it "rolls back migrations, registered after the target" do
+      it "reverses migrations, registered after the target" do
         expect(migrator).to receive(:go).with("DROP TABLE accounts;").ordered
         expect(migrator).not_to receive(:go).with("DROP TABLE roles;")
         expect(migrator).not_to receive(:go).with("DROP TABLE users;")
         subject
       end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).once
+        subject
+      end
     end
-  end # describe #rollback
+  end # describe #reverse
 
 end # describe ROM::Migrator::Runner

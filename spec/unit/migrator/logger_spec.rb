@@ -1,5 +1,4 @@
 # encoding: utf-8
-
 describe ROM::Migrator::Logger do
 
   let(:logger) { described_class.new }
@@ -12,6 +11,8 @@ describe ROM::Migrator::Logger do
     subject { logger }
 
     it { is_expected.to be_kind_of ::Logger }
+
+    it { is_expected.not_to be_frozen }
 
     it "sends messages to $stdout" do
       expect { subject.info "text" }.to change { stdout.string }.to "text\n"

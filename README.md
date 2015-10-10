@@ -75,11 +75,13 @@ end
 
 ### Implement methods to register migrations
 
-You MUST define adapter-specific methods, that allow migrator to register/unregister applied migration in a persistence, and find their numbers.
+You MUST define adapter-specific methods, that allow migrator to register/unregister applied migration, and find their numbers.
 
-*In case the adapter's gateway supports `send_query` method*, the definitions can be like the following:
+Use the `#gateway` to access persistence (all methods not defined by a migrator are forwared to the gateway).
 
 ```ruby
+# Supposet the gateway responds to #send_query
+
 # lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
@@ -90,6 +92,7 @@ module ROM::CustomAdapter
     # @return [undefined]
     #
     def prepare_registry
+      # sends to #gateway explicitly
       gateway.send_query "CREATE TABLE IF NOT EXISTS rom_custom_adapter_migrations;"
     end
 
@@ -100,17 +103,18 @@ module ROM::CustomAdapter
     # @return [undefined]
     #
     def register(number)
-      gateway.send_query "INSERT number = '#{number}' INTO rom_custom_adapter_migrations;"
+      # implicitly forwards #send_query to #gateway
+      send_query "INSERT number = '#{number}' INTO rom_custom_adapter_migrations;"
     end
 
-    # Unregisters the number of migration being rolled back
+    # Unregisters the number of migration being reversed
     #
     # @param [String] number
     #
     # @return [undefined]
     #
     def unregister(number)
-      gateway.send_query "DELETE FROM rom_custom_adapter_migrations WHERE number = '#{number}';"
+      send_query "DELETE FROM rom_custom_adapter_migrations WHERE number = '#{number}';"
     end
 
     # Returns the array of registered numbers of applied migrations
@@ -118,18 +122,17 @@ module ROM::CustomAdapter
     # @return [Array<String>]
     #
     def registered
-      gateway.send_query("SELECT number FROM rom_custom_adapter_migrations;").map(&:number)
+      send_query("SELECT number FROM rom_custom_adapter_migrations;").map(&:number)
     end
   end
 end
 ```
 
+You aren't restricted by a gateway as a storage of migrations. The same API can be implemented using a file system or remote server.
+
 ### Implement methods to make changes to persistence
 
-The migration's `#up` and `#down` methods make changes to datastore. In ROM every **gateway** defines its own low-level API to the persistence.
-
-You MUST use the current `#gateway` (link to the gateway instance) **as the only access point to the persistence!**
-You should provide methods like `create`, `delete`, `update` etc., that will be accessible to migrations.
+Provide methods like `create`, `delete`, `update` etc., that will be accessible to migrations, using the `#gateway` **as the only access point to persistence!**:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
@@ -137,11 +140,11 @@ module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
     def create_table(name)
-      generator.send_query "CREATE TABLE #{name};"
+      send_query "CREATE TABLE #{name};"
     end
 
     def drop_table(name)
-      generator.send_query "DROP TABLE #{name};"
+      send_query "DROP TABLE #{name};"
     end
   end
 end
@@ -149,7 +152,7 @@ end
 
 ### Customize default path to migrations
 
-By default migrations are expected to be found in `db/migrate`.
+By default migrations are expected to be found in `db/migrate`. You can redefine this settings for custom adapter:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
@@ -164,10 +167,11 @@ end
 
 ### Customize migration number counter
 
-Reload `#next_migration_number`, that defines the number of the migration being generated.
-By default the number is a timestamp in 'YYYYmmddHHMMSS' format.
+Reload `#next_migration_number` method, that defines the number of the migration being generated.
 
-Notice, that migrator will order migrations by *stringified* numbers in the *ascending* order. That's why stringified output of the method MUST be greater than its stringified argument. See the inline comment below for the method's contract:
+By default the number is a timestamp in `%Y%m%d%H%M%S%L` format (17 digits for the current UTC time in milliseconds).
+
+Notice, that migrator will order migrations by *stringified* numbers in the *ascending* order. That's why stringified output of the method MUST be greater than its stringified argument. See inline comments below for the contract:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
@@ -175,7 +179,7 @@ module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
 
-    # Returns the number for the next migration in a sequential order
+    # Returns the sequential number for the next migration
     #
     # @param [String, nil] last_number The number of the last existing migration
     #
@@ -193,12 +197,24 @@ end
 
 The default template is provided by the `rom-migrator` gem.
 
-To add custom template you have to:
+You can customize the template, for example, to add comments with available methods as shown below. It should be ERB file where `@klass` variable provides the name for the migration class.
 
-- create the template
-- set the path to custom template in a migrator 
+```
+# lib/rom-custom_adapter/migration.erb
+class <%= @klass %> < ROM::Migrator::Migration
+  up do
+    # create_table(:table_name).set(name: :text, age: :int).primary_key(:name)
+  end
 
-The tempate should be ERB file where `@klass` contains the name of the migration.
+  down do
+    # drop_table(:table_name)
+  end
+end
+```
+
+Notice the `Migrator` namespace for the base `Migration` above.
+
+Let the migrator to know a path to the template:
 
 ```ruby
 # lib/rom-custom_adapter/migrator.rb
@@ -210,18 +226,6 @@ module ROM::CustomAdapter
   end
 end
 ```
-```
-# lib/rom-custom_adapter/migration.erb
-class <%= @klass %> < ROM::Migrator::Migration
-  def up
-  end
-
-  def down
-  end
-end
-```
-
-Notice the `Migration` namespace for base migration class above.
 
 Using migrator in Application
 -----------------------------
@@ -238,41 +242,93 @@ setup = env.setup :custom_adapter #, whatever additional settings
 # ...
 setup.finalize
 rom = setup.env
+```
 
-# Access the migrator via corresponding Gateway:
+Then access the migrator via corresponding Gateway:
+
+```ruby
 migrator = rom.gateways[:default].migrator
+```
+
+### Building inline migration
+
+You can build and apply the migration inline:
+
+```ruby
+migration = migrator.migration do
+  up do
+    create_table :foo
+  end
+
+  down do
+    drop_table :foo
+  end
+end
+
+migration.apply   # changes the persistence
+migration.reverse # reverses the changes
+```
+
+**Be aware** that such a migration has no number. It won't be registered (added to the stored list of applied migrations) and cannot be authomatically reversed after `migration` object is utilized by GC. That's why this method of migration is useful for dev/test only. **Don't use it in production!**
+
+You can also redefine logger used by the migration. This can be useful in specs when you don't need info messages in stdout:
+
+```ruby
+logger = ::Logger.new(StringIO.new)
+
+migration = migrator.migration logger: logger do
+  # whatever
+end
 ```
 
 ### Running migrations
 
-Use the `apply` and `rollback` methods to apply or roll back migrations:
+Use the `apply` and `reverse` methods to apply or reverse migrations:
 
 ```ruby
 migrator.apply    # runs all migrations from the default folder
-migrator.rollback # rolls all migrations back
+migrator.reverse  # reverses migrations back
 ```
 
-The methods take two options:
+Both methods take three additional options:
 
-- a **target** version to migrate/rollback
-- a list of custom migrations **folders** (`db/migrate` by default)
-- a custom **logger**
+- a list of custom migrations **folders** (uses either `db/migrate`, or [another custom folder](#customize-default-path-to-migrations) by default)
+- a **target** version to migrate/reverse (applies / reverses all versions by default)
+- a custom **logger** (prints to `$stdout` by default)
 
 ```ruby
-# Migrations will be taken from folders
+# All migrations from given folders will be applied
 migrator.apply folders: ["db/migrate", "spec/dummy/db/migrate"]
 
-# Migrations will be applied from the current version to the target
+# Migrations from `db/migrate` will be applied from the current version to the target
 migrator.apply target: "20170101234319"
 
-# Or rolled back from the current version to the target one
-migrator.rollback target: "20170101234319"
+# Or reversed from the current version to the target one
+migrator.reverse target: "20170101234319"
 ```
 
-By default methods logs the result to stdio. You can change this by setting custom logger:
+By default the results are printed to `$stdio`. You can change this by setting a custom logger (an instance of `::Logger`):
 
 ```ruby
-migrator.apply logger: Logger.new
+migrator.apply logger: ::Logger.new(StringIO.new)
+```
+
+Notice, that if you use a list of folders, then migrations will be applied/reversed in order of their numbers regardless of location.
+
+Suppose `db/migrate` contains migrations number 1 and 3, and `spec/dummy/db/migrate` contains numbers 2 and 4.
+
+```ruby
+migrator.apply folders: ["db/migrate", "spec/dummy/db/migrate"]
+# will apply migrations in the ascending order: [1, 2, 3, 4]
+```
+
+Call a migrator several times if you need to apply migrations from various folders independently.
+
+```ruby
+migrator.apply folders: ["db/migrate"]
+# will apply migrations: [1, 3]
+migrator.apply folders: ["spec/dummy/db/migrate"]
+# will apply migration [4] (2 is skipped because at the moment of applying the current version were already 3)
 ```
 
 ### Scaffolding a Migration
