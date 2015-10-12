@@ -158,8 +158,8 @@ describe ROM::Migrator do
     end
   end # describe #reverse
 
-  describe "#generate" do
-    subject { migrator.generate options }
+  describe "#create_file" do
+    subject { migrator.create_file options }
     before  { allow(generator).to receive(:call) { "new_file.rb" } }
 
     context "with path" do
@@ -183,7 +183,7 @@ describe ROM::Migrator do
         expect(subject).to eql "new_file.rb"
       end
     end
-  end # describe #generate
+  end # describe #create_file
 
   describe "#migration" do
     subject { migrator.migration { up { :foo } } }

@@ -316,7 +316,7 @@ migrator.reverse target: "20170101234319"
 Use the `#generator` method to scaffold new migration. You MUST provide the name of the migration class:
 
 ```ruby
-migrator.generate path: "db/migrate", klass: "Users::CreateUser", number: "1"
+migrator.create_file path: "db/migrate", klass: "Users::CreateUser", number: "1"
 # => `db/migrate/users/1_create_user.rb
 ```
 Notice, that a migrator provides nested folders inside the path following the namespace of the `:klass` option.
@@ -325,7 +325,7 @@ When the `:path` option hasn't been set explicitly, the migrator will create a f
 
 ```ruby
 migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
-migrator.generate klass: "Users::CreateUser", number: "1"
+migrator.create_file klass: "Users::CreateUser", number: "1"
 # => `db/migrate/users/1_create_user.rb
 ```
 
@@ -335,7 +335,7 @@ When the `:number` option is skipped, the generator will check the content of mi
 migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
 # Suppose the maximum number of migrations in folders `db/migrate` and `spec/dummy/db/migrate` is "3",
 # and the `#next_migration_number` increments it by `1`:
-migrator.generate klass: "users/create_user"
+migrator.create_file klass: "users/create_user"
 # => `db/migrate/users/4_create_user.rb
 ```
 

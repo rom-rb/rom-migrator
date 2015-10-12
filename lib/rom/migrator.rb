@@ -24,7 +24,7 @@ module ROM
   # and defines APIwith 3 instance methods to:
   # - [#apply] migrations
   # - [#reverse] migrations
-  # - [#generate] the next migration
+  # - [#create_file] with the next migration
   #
   # @example
   #   class ROM::Custom::Migrator < ROM::Migrator
@@ -188,7 +188,7 @@ module ROM
     # Generates the migration
     #
     # @example Generates migation
-    #   migrator.generate(
+    #   migrator.create_file(
     #     path:   "spec/dummy/db/migrate",
     #     klass:  "Users::Create",
     #     number: "1"
@@ -197,14 +197,14 @@ module ROM
     #
     # @example Uses the first of migration folders by default
     #   migrator = gateway.migrator folders: ["db/migrate", "spec/dummy/db"]
-    #   migrator.generate(
+    #   migrator.create_file(
     #     klass:  "Users::Create",
     #     number: "1"
     #   )
     #   # => "db/migrate/users/1_create.rb"
     #
     # @example Provides the number using [#next_migration_number]
-    #   migrator.generate(
+    #   migrator.create_file(
     #     path:   "db/migrate",
     #     klass:  "Users::Create"
     #   )
@@ -215,7 +215,7 @@ module ROM
     #
     # @return (see ROM::Migrator::Generator.call)
     #
-    def generate(options)
+    def create_file(options)
       Generator.call self, { path: folders.first }.merge(options)
     end
 
