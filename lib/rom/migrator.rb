@@ -64,7 +64,7 @@ module ROM
   #
   #   migrator = ROM::Custom::Migrator.new(
   #     gateway, # some gateway providing access to persistence
-  #     folders: ["db/migrate", "db/custom"] # where migrations live
+  #     paths: ["db/migrate", "db/custom"] # where migrations live
   #   )
   #
   # @author nepalez <andrew.kozin@gmail.com>
@@ -101,11 +101,11 @@ module ROM
     #
     attr_reader :gateway
 
-    # @!attribute [r] folders
+    # @!attribute [r] paths
     #
-    # @return [String] the list of folders containing migrations
+    # @return [String] the list of paths containing migrations
     #
-    attr_reader :folders
+    attr_reader :paths
 
     # @!attribute [r] logger
     #
@@ -114,19 +114,22 @@ module ROM
     attr_reader :logger
 
     # Initializes the migrator with reference to the gateway and list of
-    # folders containing migrations.
+    # paths containing migrations.
     #
     # @param [ROM::Gateway] gateway
-    # @option options [String, Array<String>] :folders
-    #   The list of folders with migrations.
+    # @option options [String, Array<String>] :paths
+    #   The list of paths to folders containing migrations.
     #   Uses [.default_path] by default.
+    # @option options [String] :path
+    #   The same as `:paths` (added for compatibility to 'rom-sql')
     # @option options [::Logger] :logger
     #   The custom logger to be used instead of default (that logs to +$stdout+)
     #
     def initialize(gateway, options = {})
-      @gateway = gateway
-      @folders = Array(options[:folders] || self.class.default_path)
-      @logger  = options[:logger] || Logger.new
+      default_path = self.class.default_path
+      @paths       = Array(options[:paths] || options[:path] || default_path)
+      @logger      = options[:logger] || Logger.new
+      @gateway     = gateway
 
       prepare_registry # MUST be defined by adapter
     end
@@ -195,8 +198,8 @@ module ROM
     #   )
     #   # => "spec/dummy/db/migrate/users/1_create.rb"
     #
-    # @example Uses the first of migration folders by default
-    #   migrator = gateway.migrator folders: ["db/migrate", "spec/dummy/db"]
+    # @example Uses the first of migration paths by default
+    #   migrator = gateway.migrator paths: ["db/migrate", "spec/dummy/db"]
     #   migrator.create_file(
     #     klass:  "Users::Create",
     #     number: "1"
@@ -216,7 +219,7 @@ module ROM
     # @return (see ROM::Migrator::Generator.call)
     #
     def create_file(options)
-      Generator.call self, { path: folders.first }.merge(options)
+      Generator.call self, { path: paths.first }.merge(options)
     end
 
     private

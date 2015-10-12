@@ -7,10 +7,10 @@
 # * `/spec/dummy/db/migrate/2_create_roles.rb
 #
 shared_context :migrations do
-  let(:folders) { %w(/db/migrate /spec/dummy/db/migrate) }
+  let(:paths) { %w(/db/migrate /spec/dummy/db/migrate) }
 
   before do
-    folders.each(&FileUtils.method(:mkdir_p))
+    paths.each(&FileUtils.method(:mkdir_p))
 
     File
       .new("db/migrate/1_create_users.rb", "w")

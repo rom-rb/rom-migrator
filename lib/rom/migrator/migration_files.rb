@@ -7,7 +7,7 @@ class ROM::Migrator
   # Immutable collection of objects, describing migration files.
   #
   # Class factory method [.from] builds the collection of files from an array
-  # of folders, containing migrations.
+  # of paths to folders, containing migrations.
   #
   # Every item (file) in a collection has its <migration> +number+.
   # The collection knows how to filter files by their numbers,
@@ -16,9 +16,9 @@ class ROM::Migrator
   # Instance method [#to_migrations] converts the collection of files into
   # the corresponding collection of instantiated migrations.
   #
-  # @example Instantiates necessry migrations from given folders
+  # @example Instantiates necessary migrations from given paths
   #   MigrationFiles
-  #     .from(list_of_folders)          # Convert a list of folders
+  #     .from(list_of_paths)            # Convert a list of paths
   #     .upto_number(target_number)     # with migrations before the target,
   #     .after_numbers(applied_numbers) # that hasn't been applied yet,
   #     .to_migrations(                 # into a collection of migrations
@@ -32,16 +32,16 @@ class ROM::Migrator
 
     include Enumerable, Errors, Immutability
 
-    # Builds the collection of migration files from a list of folders
+    # Builds the collection of migration files from a list of paths
     #
-    # @param [String, Array<String>, nil] folders
+    # @param [String, Array<String>, nil] paths
     #
     # @return [ROM::Migrator::MigrationFiles]
     #
-    def self.from(*folders)
-      files = folders.flatten.map do |root|
-        paths = Dir[File.join(root, "**/*.rb")]
-        paths.map { |path| MigrationFile.new(root: root, path: path) }
+    def self.from(*paths)
+      files = paths.flatten.map do |root|
+        dirs = Dir[File.join(root, "**/*.rb")]
+        dirs.map { |path| MigrationFile.new(root: root, path: path) }
       end
       new files
     end

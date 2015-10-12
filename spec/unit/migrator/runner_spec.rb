@@ -2,9 +2,9 @@
 describe ROM::Migrator::Runner do
 
   let(:runner)   { described_class.new migrator, target: target }
-  let(:migrator) { double(folders: folders, logger: logger).as_null_object }
+  let(:migrator) { double(paths: paths, logger: logger).as_null_object }
   let(:target)   { "2" }
-  let(:folders)  { %w(/db/migrate /spec/dummy/db/migrate) }
+  let(:paths)    { %w(/db/migrate /spec/dummy/db/migrate) }
   let(:logger)   { double(:logger).as_null_object }
 
   describe ".new" do

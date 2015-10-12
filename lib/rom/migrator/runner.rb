@@ -82,11 +82,11 @@ class ROM::Migrator
     private
 
     def files
-      MigrationFiles.from(folders)
+      MigrationFiles.from(paths)
     end
 
-    def folders
-      migrator.folders
+    def paths
+      migrator.paths
     end
 
     def registered

@@ -9,7 +9,7 @@ describe ROM::Migrator::MigrationFiles do
 
   describe ".from", :memfs do
     include_context :migrations
-    subject { described_class.from folders }
+    subject { described_class.from paths }
 
     it "creates the collection with all files in given folders" do
       expect(subject).to be_kind_of described_class

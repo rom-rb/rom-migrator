@@ -227,7 +227,7 @@ module ROM::CustomAdapter
 end
 ```
 
-Using migrator in Application
+Using Migrator in Application
 -----------------------------
 
 To use a migrator you have to set rom environment and prepare a +gateway+:
@@ -253,10 +253,16 @@ Then access the migrator via corresponding Gateway:
 migrator = gateway.migrator
 ```
 
-By default the migrator will look for migrations in the [adapter-specific default path](#customize-default-path-to-migrations). You can set paths to migration explicitly:
+By default the migrator will look for migrations in the [adapter-specific default path](#customize-default-path-to-migrations). You can change the path explicitly:
 
 ```ruby
-migrator = gateway.migrator folders: ["db/migrate", "spec/dummy/db/migrate"]
+migrator = gateway.migrator path: "db/migrate/custom_adapter"
+```
+
+You can also refer to a list of folders, containing migrations:
+
+```ruby
+migrator = gateway.migrator paths: ["db/migrate", "spec/dummy/db/migrate"]
 ```
 
 The migrator publishes log messages to `$stdout`. To change this option you can set a custom logger (some kind of ruby `::Logger` klass):
@@ -321,18 +327,18 @@ migrator.create_file path: "db/migrate", klass: "Users::CreateUser", number: "1"
 ```
 Notice, that a migrator provides nested folders inside the path following the namespace of the `:klass` option.
 
-When the `:path` option hasn't been set explicitly, the migrator will create a file in the first of its folders:
+When the `:path` option hasn't been set explicitly, the migrator will create a file in the first of its paths:
 
 ```ruby
-migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
+migrator = gateway.new paths: ["db/migrate", "spec/dummy/db/migrate"]
 migrator.create_file klass: "Users::CreateUser", number: "1"
 # => `db/migrate/users/1_create_user.rb
 ```
 
-When the `:number` option is skipped, the generator will check the content of migrator's folders to find out the number of the last migration, and then use `#next_migration_number` method to count the number for new migration.
+When the `:number` option is skipped, the generator will check the content of migrator's paths to find out the number of the last migration, and then use `#next_migration_number` method to count the number for new migration.
 
 ```ruby
-migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
+migrator = gateway.new paths: ["db/migrate", "spec/dummy/db/migrate"]
 # Suppose the maximum number of migrations in folders `db/migrate` and `spec/dummy/db/migrate` is "3",
 # and the `#next_migration_number` increments it by `1`:
 migrator.create_file klass: "users/create_user"

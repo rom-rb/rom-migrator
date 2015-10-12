@@ -72,14 +72,14 @@ describe ROM::Migrator::Generator do
 
     shared_examples :adding_migration_with_number do |num|
       include_context :custom_template do
-        let(:folders)  { %w(/db/migrate /spec/dummy/db/migrate) }
+        let(:paths)    { %w(/db/migrate /spec/dummy/db/migrate) }
         let(:new_path) { "/db/migrate/custom/cats/#{num}_create_table.rb" }
         let(:content)  { "class Cats::CreateTable < ROM::Migrator::Migration" }
       end
 
       before do
         allow(migrator).to receive(:next_migration_number, &numerator)
-        allow(migrator).to receive(:folders) { folders }
+        allow(migrator).to receive(:paths) { paths }
         allow(migrator).to receive(:template) { template }
         allow(migrator).to receive(:logger) { logger }
       end

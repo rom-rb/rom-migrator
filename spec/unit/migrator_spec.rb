@@ -8,10 +8,9 @@ describe ROM::Migrator do
   let(:klass)     { Class.new(described_class) { def prepare_registry; end } }
   let(:runner)    { ROM::Migrator::Runner }
   let(:generator) { ROM::Migrator::Generator }
-
-  let(:migrator)  { klass.new gateway, folders: folders, logger: logger }
+  let(:migrator)  { klass.new gateway, paths: paths, logger: logger }
   let(:gateway)   { double :gateway, foo: :qux }
-  let(:folders)   { ["db/migrate", "spec/dummy/db/migrate"] }
+  let(:paths)     { ["db/migrate", "spec/dummy/db/migrate"] }
   let(:logger)    { double(:logger).as_null_object }
 
   describe ".default_path" do
@@ -60,15 +59,15 @@ describe ROM::Migrator do
     it { is_expected.to eql gateway }
   end # describe #gateway
 
-  describe "#folders" do
-    subject { migrator.folders }
+  describe "#paths" do
+    subject { migrator.paths }
 
-    context "when list provided" do
-      it { is_expected.to eql folders }
+    context "when list of paths provided" do
+      it { is_expected.to eql paths }
     end
 
-    context "when string provided" do
-      let(:migrator) { klass.new gateway, folders: "custom" }
+    context "when single path provided" do
+      let(:migrator) { klass.new gateway, path: "custom" }
 
       it { is_expected.to eql ["custom"] }
     end
@@ -76,7 +75,7 @@ describe ROM::Migrator do
     context "when not provided" do
       let(:migrator) { klass.new gateway }
 
-      it "is set from class" do
+      it "is taken from ::default_path" do
         klass.default_path "custom"
 
         expect(subject).to eql ["custom"]
@@ -173,7 +172,7 @@ describe ROM::Migrator do
       end
     end
 
-    context "without folders" do
+    context "without paths" do
       let(:options) { { klass: "Foo::Bar", number: "3" } }
 
       it "builds and calls a generator with the first folder" do
