@@ -230,7 +230,7 @@ end
 Using migrator in Application
 -----------------------------
 
-To use a migrator you have to prepare ROM environment first:
+To use a migrator you have to set rom environment and prepare a +gateway+:
 
 ```ruby
 require "rom-custom_adapter"
@@ -242,12 +242,28 @@ setup = env.setup :custom_adapter #, whatever additional settings
 # ...
 setup.finalize
 rom = setup.env
+
+# Use a gateway
+gateway = rom.gateways[:default]
 ```
 
 Then access the migrator via corresponding Gateway:
 
 ```ruby
-migrator = rom.gateways[:default].migrator
+migrator = gateway.migrator
+```
+
+By default the migrator will look for migrations in the [adapter-specific default path](#customize-default-path-to-migrations). You can set paths to migration explicitly:
+
+```ruby
+migrator = gateway.migrator folders: ["db/migrate", "spec/dummy/db/migrate"]
+```
+
+The migrator publishes log messages to `$stdout`. To change this option you can set a custom logger (some kind of ruby `::Logger` klass):
+
+```ruby
+logger = ::Logger.new(::StringIO.new)
+migrator = gateway.migrator logger: logger
 ```
 
 ### Building inline migration
@@ -271,16 +287,6 @@ migration.reverse # reverses the changes
 
 **Be aware** that such a migration has no number. It won't be registered (added to the stored list of applied migrations) and cannot be authomatically reversed after `migration` object is utilized by GC. That's why this method of migration is useful for dev/test only. **Don't use it in production!**
 
-You can also redefine logger used by the migration. This can be useful in specs when you don't need info messages in stdout:
-
-```ruby
-logger = ::Logger.new(StringIO.new)
-
-migration = migrator.migration logger: logger do
-  # whatever
-end
-```
-
 ### Running migrations
 
 Use the `apply` and `reverse` methods to apply or reverse migrations:
@@ -290,80 +296,48 @@ migrator.apply    # runs all migrations from the default folder
 migrator.reverse  # reverses migrations back
 ```
 
-Both methods take three additional options:
-
-- a list of custom migrations **folders** (uses either `db/migrate`, or [another custom folder](#customize-default-path-to-migrations) by default)
-- a **target** version to migrate/reverse (applies / reverses all versions by default)
-- a custom **logger** (prints to `$stdout` by default)
+Both methods take an option `:target` for a version to migrate persistence to.
 
 ```ruby
-# All migrations from given folders will be applied
-migrator.apply folders: ["db/migrate", "spec/dummy/db/migrate"]
+# All migrations, that hasn't been applied before, will be applied
+migrator.apply
 
-# Migrations from `db/migrate` will be applied from the current version to the target
+# Only those migrations, that hasn't been applied before,
+# and whose numbers not greater when the target, will be applied
 migrator.apply target: "20170101234319"
 
-# Or reversed from the current version to the target one
+# All registered (applied) migrations, whose numbers not less when the target,
+# will be reversed
 migrator.reverse target: "20170101234319"
-```
-
-By default the results are printed to `$stdio`. You can change this by setting a custom logger (an instance of `::Logger`):
-
-```ruby
-migrator.apply logger: ::Logger.new(StringIO.new)
-```
-
-Notice, that if you use a list of folders, then migrations will be applied/reversed in order of their numbers regardless of location.
-
-Suppose `db/migrate` contains migrations number 1 and 3, and `spec/dummy/db/migrate` contains numbers 2 and 4.
-
-```ruby
-migrator.apply folders: ["db/migrate", "spec/dummy/db/migrate"]
-# will apply migrations in the ascending order: [1, 2, 3, 4]
-```
-
-Call a migrator several times if you need to apply migrations from various folders independently.
-
-```ruby
-migrator.apply folders: ["db/migrate"]
-# will apply migrations: [1, 3]
-migrator.apply folders: ["spec/dummy/db/migrate"]
-# will apply migration [4] (2 is skipped because at the moment of applying the current version were already 3)
 ```
 
 ### Scaffolding a Migration
 
-Use the `#generator` method to scaffold new migration. You MUST provide the name of the migration class. Migration number CAN be provided as well:
+Use the `#generator` method to scaffold new migration. You MUST provide the name of the migration class:
 
 ```ruby
+migrator.generate path: "db/migrate", klass: "Users::CreateUser", number: "1"
+# => `db/migrate/users/1_create_user.rb
+```
+Notice, that a migrator provides nested folders inside the path following the namespace of the `:klass` option.
+
+When the `:path` option hasn't been set explicitly, the migrator will create a file in the first of its folders:
+
+```ruby
+migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
 migrator.generate klass: "Users::CreateUser", number: "1"
 # => `db/migrate/users/1_create_user.rb
 ```
 
-The result will be stored in the default folder.
-
-When the number is skipped, the generator will check the content of the <default> folder to find out the number of the last migration, and apply `#next_migration_number` method to count the number for the migration being created.
+When the `:number` option is skipped, the generator will check the content of migrator's folders to find out the number of the last migration, and then use `#next_migration_number` method to count the number for new migration.
 
 ```ruby
-# Suppose the maximum number of migrations in `db/migrate` is "3"
-
+migrator = gateway.new folders: ["db/migrate", "spec/dummy/db/migrate"]
+# Suppose the maximum number of migrations in folders `db/migrate` and `spec/dummy/db/migrate` is "3",
+# and the `#next_migration_number` increments it by `1`:
 migrator.generate klass: "users/create_user"
 # => `db/migrate/users/4_create_user.rb
 ```
-
-You can customize a list of all folders, that contain migrations. Their order is sufficient because new migration will be placed to the first one, while the others are only used to check existing migrations:
-
-```ruby
-# Suppose the maximum number of migrations in `db/migrate` and `spec/dummy/db/migrate` is "4"
-
-migrator.generate klass: "users/create_user", folders: ["db/migrate", "spec/dummy/db/migrate"]
-# => "/db/migrate/users/5_create_user.rb"
-
-migrator.generate klass: "Users::CreateRole", folders: ["spec/dummy/db/migrate", "db/migrate"]
-# => "/spec/dummy/db/migrate/users/6_create_role.rb"
-```
-
-Notice, that a migrator provides nested folders inside the target directory following the namespace of the migration.
 
 Compatibility
 -------------

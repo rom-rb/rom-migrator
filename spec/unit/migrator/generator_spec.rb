@@ -1,25 +1,22 @@
 # encoding: utf-8
 describe ROM::Migrator::Generator do
 
-  let(:generator) { described_class.new options }
-  let(:options)   { { migrator: migrator, folders: folders, klass: klass } }
-  let(:folders)   { ["/db/migrate", "/spec/dummy/db/migrate"] }
-  let(:klass)     { "users/create_user" }
+  let(:generator) { described_class.new migrator, options }
+  let(:migrator)  { double(:migrator).as_null_object }
+  let(:options)   { { path: path, klass: klass, number: number } }
 
-  let(:migrator) do # mock the migrator with a number counter
-    object = double :migrator, template: "/config/custom_migration.erb"
-    allow(object).to receive(:next_migration_number) { |i| "#{i.to_i + 1}m" }
-    object
-  end
+  let(:path)      { "/db/migrate/custom" }
+  let(:klass)     { "cats/create_table" }
+  let(:number)    { nil }
 
   describe ".call" do
     let(:generator) { double :generator, call: nil }
 
     before { allow(described_class).to receive(:new) { generator } }
-    after  { described_class.call options }
+    after  { described_class.call migrator, options }
 
     it "builds and calls the generator" do
-      expect(described_class).to receive(:new).with(options)
+      expect(described_class).to receive(:new).with(migrator, options)
       expect(generator).to receive(:call)
     end
   end # describe .call
@@ -40,35 +37,27 @@ describe ROM::Migrator::Generator do
     end
   end # describe .new
 
-  describe "#options" do
-    subject { generator.options }
+  describe "#path" do
+    subject { generator.path }
 
-    it { is_expected.to eql options }
-  end # describe #options
+    it { is_expected.to eql path }
+  end # path
 
-  describe "#number", :memfs do
+  describe "#klass" do
+    subject { generator.klass }
+
+    it { is_expected.to eql "Cats::CreateTable" }
+  end # describe #klass
+
+  describe "#number" do
     subject { generator.number }
 
+    it { is_expected.to be_nil }
+
     context "when set explicitly" do
-      before { options.update(number: 7) }
+      let(:number) { "1" }
 
-      it "is taken from options" do
-        expect(subject).to eql "7"
-      end
-    end
-
-    context "if no migrations exist" do
-      it "is the first number" do
-        expect(subject).to eql "1m"
-      end
-    end
-
-    context "if migrations exist" do
-      include_context :migrations
-
-      it "is the next number" do
-        expect(subject).to eql "4m"
-      end
+      it { is_expected.to eql number }
     end
   end # describe #number
 
@@ -78,41 +67,52 @@ describe ROM::Migrator::Generator do
     it { is_expected.to eql migrator }
   end # describe #migrator
 
-  describe "#folders" do
-    subject { generator.folders }
-
-    it { is_expected.to eql folders }
-  end # describe #folders
-
-  describe "#klass" do
-    subject { generator.klass }
-
-    it { is_expected.to eql "Users::CreateUser" }
-  end # describe #klass
-
   describe "#call", :memfs do
     subject { generator.call }
 
-    include_context :custom_template
+    shared_examples :adding_migration_with_number do |num|
+      include_context :custom_template do
+        let(:folders)  { %w(/db/migrate /spec/dummy/db/migrate) }
+        let(:new_path) { "/db/migrate/custom/cats/#{num}_create_table.rb" }
+        let(:content)  { "class Cats::CreateTable < ROM::Migrator::Migration" }
+      end
 
-    context "if no migrations exist" do
+      before do
+        allow(migrator).to receive(:next_migration_number, &numerator)
+        allow(migrator).to receive(:folders) { folders }
+        allow(migrator).to receive(:template) { template }
+        allow(migrator).to receive(:logger) { logger }
+      end
+
+      let(:numerator) { proc { |i| "#{i.to_i + 1}m" } }
+      let(:logger)    { double(:logger).as_null_object }
+
       it "generates first migration" do
         subject
-        content = File.read "db/migrate/users/1m_create_user.rb"
-        expect(content)
-          .to include "class Users::CreateUser < ROM::Migrator::Migration"
+        expect(File).to be_exist new_path
+        expect(File.read(new_path)).to include content
+      end
+
+      it "logs result" do
+        expect(logger)
+          .to receive(:info)
+          .with "New migration created at '#{new_path}'"
+        subject
+      end
+
+      it "returns path to migration" do
+        expect(subject).to eql new_path
       end
     end
 
-    context "if migrations exist" do
-      include_context :migrations
+    it_behaves_like :adding_migration_with_number, "1m"
 
-      it "generates next migration" do
-        subject
-        content = File.read "db/migrate/users/4m_create_user.rb"
-        expect(content)
-          .to include "class Users::CreateUser < ROM::Migrator::Migration"
-      end
+    it_behaves_like :adding_migration_with_number, "4m" do
+      include_context :migrations
+    end
+
+    it_behaves_like :adding_migration_with_number, "5m" do
+      let(:number) { "5m" }
     end
   end # describe #call
 

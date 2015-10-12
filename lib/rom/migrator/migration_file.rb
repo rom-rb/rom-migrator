@@ -53,17 +53,14 @@ class ROM::Migrator
 
     # Loads the file and initializes the migration it describes
     #
-    # @param [Hash] options
-    # @option options [ROM::Migrator] migrator
+    # @param [ROM::Migrator] migrator
     #   The migrator that provides access to persistence for migration
-    # @option options [::Logger] logger
-    #   The custom logger to report migration's result
     #
     # @return [ROM::Migrator::Migration]
     #
-    def to_migration(options)
+    def to_migration(migrator)
       require path
-      constant.new options.merge(number: number)
+      constant.new migrator, number: number
     end
 
     private

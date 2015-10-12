@@ -3,9 +3,9 @@ describe ROM::Migrator::Migrations do
 
   let(:migrations) { described_class.new foo, [bar, baz] }
 
-  let(:foo) { double :migration, number: "foo", apply: nil, reverse: nil }
-  let(:bar) { double :migration, number: "bar", apply: nil, reverse: nil }
-  let(:baz) { double :migration, number: "baz", apply: nil, reverse: nil }
+  let(:foo) { double(:migration, number: "foo").as_null_object }
+  let(:bar) { double(:migration, number: "bar").as_null_object }
+  let(:baz) { double(:migration, number: "baz").as_null_object }
 
   describe ".new" do
     subject { migrations }

@@ -12,13 +12,19 @@ describe ROM::Gateway do
   let(:gateway) { ROM::Custom::Gateway.new }
 
   describe "#migrator" do
-    subject { gateway.migrator }
+    subject { gateway.migrator(folders: folders) }
+
+    let(:folders) { %w(db/migrate spec/dummy/migrate) }
 
     context "when adapter is present" do
       it { is_expected.to be_kind_of ROM::Custom::Migrator }
 
       it "refers back to the gateway" do
         expect(subject.gateway).to eql gateway
+      end
+
+      it "carries folders" do
+        expect(subject.folders).to eql folders
       end
     end
 

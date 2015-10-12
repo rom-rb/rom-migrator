@@ -113,12 +113,11 @@ class ROM::Migrator
     # instantiated with given migrator and logger
     #
     # @param (see ROM::Migrator::MigrationFile#to_migration)
-    # @option (see ROM::Migrator::MigrationFile#to_migration)
     #
     # @return [ROM::Migrator::Migrations]
     #
-    def to_migrations(options)
-      Migrations.new map { |file| file.to_migration(options) }
+    def to_migrations(migrator)
+      Migrations.new map { |file| file.to_migration(migrator) }
     end
 
     private

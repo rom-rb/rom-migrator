@@ -115,20 +115,20 @@ describe ROM::Migrator::MigrationFile do
   end # describe #path
 
   describe "#to_migration", :memfs do
-    include_context :migrations
-    subject { file.to_migration migrator: migrator, logger: logger }
+    include_context :migrations do
+      let(:root) { "/db/migrate" }
+      let(:path) { "/db/migrate/1_create_users.rb" }
+    end
+
+    subject { file.to_migration migrator }
 
     let(:migrator) { double :migrator }
-    let(:logger)   { double :logger }
-    let(:file) do
-      klass.new root: "/db/migrate", path: "/db/migrate/1_create_users.rb"
-    end
+    let(:file) { klass.new root: root, path: path }
 
     it "builds the migration" do
       expect(subject).to be_kind_of   CreateUsers
       expect(subject.number).to eql   "1"
       expect(subject.migrator).to eql migrator
-      expect(subject.logger).to eql   logger
     end
 
     after { Object.send :remove_const, :CreateUsers }

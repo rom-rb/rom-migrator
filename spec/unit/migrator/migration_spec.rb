@@ -4,11 +4,10 @@ describe ROM::Migrator::Migration do
   let(:klass)     { Class.new(described_class) }
   let(:block)     { proc { go :foo } }
 
-  let(:migration) { klass.new(options) }
-  let(:options)   { { migrator: migrator, logger: logger, number: number } }
-  let(:migrator)  { double :migrator, go: :BAZ, register: nil, unregister: nil }
-  let(:logger)    { ::Logger.new(StringIO.new) }
+  let(:migration) { klass.new(migrator, number: number) }
   let(:number)    { "foo" }
+  let(:logger)    { double(:logger).as_null_object }
+  let(:migrator)  { double(:migrator, go: :BAZ, logger: logger).as_null_object }
 
   describe ".up" do
     subject { klass.up(&block) }
@@ -27,7 +26,7 @@ describe ROM::Migrator::Migration do
   end # describe .down
 
   describe ".new" do
-    subject { klass.new migrator: migrator }
+    subject { klass.new migrator }
 
     it { is_expected.to be_frozen }
     it { is_expected.not_to be_immutable }
@@ -39,29 +38,11 @@ describe ROM::Migrator::Migration do
     it { is_expected.to eql number }
 
     context "when not provided" do
-      let(:options) { { migrator: migrator } }
+      let(:migration) { klass.new migrator }
 
       it { is_expected.to be_nil }
     end
   end # describe #number
-
-  describe "#logger" do
-    subject { migration.logger }
-
-    it { is_expected.to eql logger }
-
-    context "when not provided" do
-      let(:options) { { migrator: migrator } }
-
-      it { is_expected.to be_kind_of ROM::Migrator::Logger }
-    end
-
-    context "when set to nil" do
-      let(:logger) { nil }
-
-      it { is_expected.to be_kind_of ROM::Migrator::Logger }
-    end
-  end # describe #logger
 
   describe "#apply" do
     before  { klass.up(&block) }
@@ -116,7 +97,7 @@ describe ROM::Migrator::Migration do
         expect(logger)
           .to receive(:error)
           .with "The error occured when migration number 'foo' was applied:" \
-                "\nsomething went wrong"
+                " something went wrong"
         subject rescue nil
       end
 
@@ -179,7 +160,7 @@ describe ROM::Migrator::Migration do
         expect(logger)
           .to receive(:error)
           .with "The error occured when migration number 'foo' was reversed:" \
-                "\nsomething went wrong"
+                " something went wrong"
         subject rescue nil
       end
 
@@ -199,16 +180,14 @@ describe ROM::Migrator::Migration do
   end # describe #arbitrary_method
 
   describe "#respond_to?" do
-    subject { migration.respond_to? method }
+    subject { migration.respond_to? :go }
 
     context "method provided by #migrator" do
-      let(:method) { :go }
-
       it { is_expected.to eql true }
     end
 
     context "method not provided by #migrator" do
-      let(:method) { :foo }
+      let(:migrator) { double :migrator }
 
       it { is_expected.to eql false }
     end

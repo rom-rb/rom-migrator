@@ -29,9 +29,14 @@ class ROM::Migrator
 
     include ROM::Options
 
-    option :number,   reader: true
-    option :migrator, reader: true, required: true
-    option :logger,   reader: true
+    option :number, reader: true
+
+    # @!attribute [r] migrator
+    #
+    # @return [ROM::Migrator]
+    #   The migrator that provides access to persistence and logs the results
+    #
+    attr_reader :migrator
 
     # Gets or sets the block to be called when the migration is applied
     #
@@ -73,11 +78,11 @@ class ROM::Migrator
     # @option options [::Logger] :logger
     #   Custom logger to which the migration reports its results
     #
-    def initialize(_)
-      super
+    def initialize(migrator, options = nil)
+      super options
+      @migrator = migrator
       @up       = self.class.up
       @down     = self.class.down
-      @logger ||= Logger.new
       @mutex    = Mutex.new
       freeze
     end
@@ -118,7 +123,6 @@ class ROM::Migrator
 
     private
 
-    # All methods, used by [.up] and [.down], are forwarded to the migrator
     def method_missing(*args)
       @migrator.public_send(*args)
     end
@@ -129,15 +133,16 @@ class ROM::Migrator
 
     def run_threadsafe_and_log_as(done, &block)
       @mutex.synchronize { run_and_log_as(done, &block) }
-      self
     end
 
     def run_and_log_as(done)
       yield
-      logger.info "The #{self} has been #{done}"
     rescue => error
-      logger.error "The error occured when #{self} was #{done}:\n#{error}"
+      logger.error "The error occured when #{self} was #{done}: #{error}"
       raise
+    else
+      logger.info "The #{self} has been #{done}"
+      self
     end
 
   end # class Migration

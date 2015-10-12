@@ -3,9 +3,9 @@ describe ROM::Migrator::MigrationFiles do
 
   let(:files) { described_class.new foo, [bar, baz] }
 
-  let(:foo) { frozen_double :file, number: "foo", to_migration: double }
-  let(:bar) { frozen_double :file, number: "bar", to_migration: double }
-  let(:baz) { frozen_double :file, number: "baz", to_migration: double }
+  let(:foo) { frozen_double(number: "foo", to_migration: :migration_foo) }
+  let(:bar) { frozen_double(number: "bar", to_migration: :migration_bar) }
+  let(:baz) { frozen_double(number: "baz", to_migration: :migration_baz) }
 
   describe ".from", :memfs do
     include_context :migrations
@@ -115,19 +115,20 @@ describe ROM::Migrator::MigrationFiles do
   end # describe #last_number
 
   describe "#to_migrations" do
-    subject { files.to_migrations(options) }
-    let(:options) { { migrator: double, logger: double } }
+    subject { files.to_migrations(migrator) }
+    let(:migrator) { double :migrator }
 
     it "converts all files to migrations" do
       [foo, bar, baz].each do |file|
-        expect(file).to receive(:to_migration).with(options).once
+        expect(file).to receive(:to_migration).with(migrator).once
       end
       subject
     end
 
     it "returns the collection of migrations" do
       expect(subject).to be_kind_of ROM::Migrator::Migrations
-      expect(subject.to_a).to match_array [foo, bar, baz].map(&:to_migration)
+      expect(subject.to_a)
+        .to match_array [:migration_foo, :migration_bar, :migration_baz]
     end
   end # describe #to_migrations
 

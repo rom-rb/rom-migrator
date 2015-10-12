@@ -11,10 +11,13 @@ module ROM
 
     # Returns a migrator that decorates the gateway
     #
+    # @param [Hash] options
+    # @option (see ROM::Migrator#initializer)
+    #
     # @return [ROM::Migrator]
     #
-    def migrator
-      ROM.adapters.fetch(adapter)::Migrator.new(self)
+    def migrator(options = {})
+      ROM.adapters.fetch(adapter)::Migrator.new(self, options)
     rescue KeyError
       raise AdapterNotPresentError.new(adapter, :migrator)
     rescue NameError

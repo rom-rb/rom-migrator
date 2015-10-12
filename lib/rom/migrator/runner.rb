@@ -2,7 +2,7 @@
 
 class ROM::Migrator
 
-  # Decorates the migrator with methods to apply / reverse migrations
+  # Migrates the persistence to optional target version
   #
   # @api private
   #
@@ -13,31 +13,46 @@ class ROM::Migrator
     include ROM::Options
     include Enumerable
 
-    option :folders,  reader: true
-    option :migrator, reader: true
-    option :target,   reader: true
-    option :logger,   reader: true
+    option :target, reader: true
 
     # Instantiates and applies the runner at once
     #
-    # @param [Hash] options
+    # @param (see #initialize)
     # @option (see #initialize)
     #
-    # @return (see #apply)
+    # @return [undefined]
     #
-    def self.apply(options)
-      new(options).apply
+    def self.apply(migrator, options)
+      new(migrator, options).apply
     end
 
     # Instantiates the runner and reverses migrations at once
     #
-    # @param [Hash] options
+    # @param (see #initialize)
     # @option (see #initialize)
     #
-    # @return (see #reverse)
+    # @return [undefined]
     #
-    def self.reverse(options)
-      new(options).reverse
+    def self.reverse(migrator, options)
+      new(migrator, options).reverse
+    end
+
+    # @!attribute [r] migrator
+    #
+    # @return [ROM::Migrator] The decorated migrator
+    #
+    attr_reader :migrator
+
+    # Initializes the runner object
+    #
+    # @param [ROM::Migrator] migrator
+    #   The migrator, that provides access to persistence
+    # @param [Hash] options
+    # @option options [String, nil] :target The target version to migrate to
+    #
+    def initialize(migrator, options)
+      super options
+      @migrator = migrator
     end
 
     # Applies all migrations in the collection
@@ -45,11 +60,10 @@ class ROM::Migrator
     # @return [undefined]
     #
     def apply
-      MigrationFiles
-        .from(folders)
+      files
         .after_numbers(registered)
         .upto_number(target)
-        .to_migrations(migrator: migrator, logger: logger)
+        .to_migrations(migrator)
         .apply
     end
 
@@ -58,15 +72,22 @@ class ROM::Migrator
     # @return [undefined]
     #
     def reverse
-      MigrationFiles
-        .from(folders)
+      files
         .with_numbers(registered)
         .after_numbers(target)
-        .to_migrations(migrator: migrator, logger: logger)
+        .to_migrations(migrator)
         .reverse
     end
 
     private
+
+    def files
+      MigrationFiles.from(folders)
+    end
+
+    def folders
+      migrator.folders
+    end
 
     def registered
       migrator.registered
