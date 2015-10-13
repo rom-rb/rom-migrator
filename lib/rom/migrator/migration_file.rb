@@ -32,7 +32,7 @@ class ROM::Migrator
 
     include ROM::Options, Errors, Immutability
 
-    option :root,   reader: true, type: String, required: true
+    option :root,   reader: true, required: true
     option :klass,  reader: true
     option :number, reader: true
     option :path,   reader: true
@@ -45,8 +45,8 @@ class ROM::Migrator
     # @option options [#to_s] :klass  The class name of the migration
     # @option options [#to_s] :number The number of the migration
     #
-    def initialize(options)
-      super(options)
+    def initialize(_)
+      super
       path ? initialize_from_path : initialize_from_klass_and_number
       validate_file
     end

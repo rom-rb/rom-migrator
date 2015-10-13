@@ -122,19 +122,19 @@ module ROM
     # paths containing migrations.
     #
     # @param [ROM::Gateway] gateway
-    # @option options [String, Array<String>] :paths
+    # @option options [Array<#to_s>] :paths
     #   The list of paths to folders containing migrations.
     #   Uses [.default_path] by default.
-    # @option options [String] :path
+    # @option options [#to_s] :path
     #   The same as `:paths` (added for compatibility to 'rom-sql')
     # @option options [::Logger] :logger
     #   The custom logger to be used instead of default (that logs to +$stdout+)
     #
     def initialize(gateway, options = {})
-      default_path = self.class.default_path
-      @paths       = Array(options[:paths] || options[:path] || default_path)
-      @logger      = options[:logger] || Logger.new
-      @gateway     = gateway
+      default  = self.class.default_path
+      @paths   = Array(options[:paths] || options[:path] || default).map(&:to_s)
+      @logger  = options[:logger] || Logger.new
+      @gateway = gateway
 
       prepare_registry # MUST be defined by adapter
     end

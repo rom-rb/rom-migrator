@@ -62,17 +62,23 @@ describe ROM::Migrator do
   describe "#paths" do
     subject { migrator.paths }
 
-    context "when list of paths provided" do
+    context "when list of paths is set" do
       it { is_expected.to eql paths }
     end
 
-    context "when single path provided" do
+    context "when single path is set" do
       let(:migrator) { klass.new gateway, path: "custom" }
 
       it { is_expected.to eql ["custom"] }
     end
 
-    context "when not provided" do
+    context "when pathname is set" do
+      let(:migrator) { klass.new gateway, path: Pathname("custom") }
+
+      it { is_expected.to eql ["custom"] }
+    end
+
+    context "when no paths are set" do
       let(:migrator) { klass.new gateway }
 
       it "is taken from ::default_path" do
