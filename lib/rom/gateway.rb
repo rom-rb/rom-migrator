@@ -31,8 +31,6 @@ module ROM
     #   MigratorNotPresentError.new :custom_adapter
     #
     class MigratorNotPresentError < NameError
-      include Immutability
-
       # Initializes exception with adapter-specific error message
       #
       # @param [#to_s] adapter
