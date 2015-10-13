@@ -9,6 +9,7 @@ shared_context :custom_template do
     FileUtils.mkdir_p "/config"
 
     File.new(template, "w").write <<-TEXT.gsub(/ *\|/, "")
+      |# This is a custom template
       |class <%= @klass %> < ROM::Migrator::Migration
       |  up do
       |  end

@@ -23,7 +23,7 @@ describe ROM::Migrator do
   end # describe .adapter
 
   describe ".template" do
-    let(:default) { File.expand_path "rom/migrator/generator/template.erb" }
+    let(:default) { File.join ROOT, "lib/rom/migrator/generator/template.erb" }
 
     it "gets/sets path to template" do
       expect { klass.template "custom" }

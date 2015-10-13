@@ -26,3 +26,6 @@ if ENV["MUTANT"]
     config.around { |example| Timeout.timeout(0.5, &example) }
   end
 end
+
+# Path to gem's root used in some specs
+ROOT = File.expand_path("../..", __FILE__)

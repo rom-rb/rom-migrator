@@ -73,15 +73,20 @@ module ROM
   #
   class Migrator
 
+    NOTHING = Class.new.freeze
+    DEFAULT_PATH = "db/migrate".freeze
+    DEFAULT_TEMPLATE =
+      File.expand_path("../migrator/generator/template.erb", __FILE__).freeze
+
     # Gets or sets the adapter-specific default path to migrations
     #
     # @param [String, nil] value
     #
     # @return [String]
     #
-    def self.default_path(value = nil)
-      @default_path = value if value
-      @default_path || "db/migrate"
+    def self.default_path(value = NOTHING)
+      @default_path = value unless value.equal?(NOTHING)
+      @default_path || DEFAULT_PATH
     end
 
     # Gets or sets path to adapter-specific template for migrations
@@ -90,9 +95,9 @@ module ROM
     #
     # @return [String]
     #
-    def self.template(value = nil)
-      @template = value if value
-      @template || File.expand_path("rom/migrator/generator/template.erb")
+    def self.template(value = NOTHING)
+      @template = value unless value.equal?(NOTHING)
+      @template || DEFAULT_TEMPLATE
     end
 
     # @!attribute [r] gateway
