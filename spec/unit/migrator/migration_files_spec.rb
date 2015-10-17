@@ -1,21 +1,11 @@
 # encoding: utf-8
 describe ROM::Migrator::MigrationFiles do
 
-  let(:files) { described_class.new foo, [bar, baz] }
+  let(:files) { described_class.new [foo, bar, baz] }
 
   let(:foo) { frozen_double(number: "foo", to_migration: :migration_foo) }
   let(:bar) { frozen_double(number: "bar", to_migration: :migration_bar) }
   let(:baz) { frozen_double(number: "baz", to_migration: :migration_baz) }
-
-  describe ".from", :memfs do
-    include_context :migrations
-    subject { described_class.from paths }
-
-    it "creates the collection with all files in given folders" do
-      expect(subject).to be_kind_of described_class
-      expect(subject.map(&:number)).to contain_exactly("1", "2", "3")
-    end
-  end # describe .from
 
   describe ".new" do
     subject { files }
@@ -34,31 +24,19 @@ describe ROM::Migrator::MigrationFiles do
   end # describe #each
 
   describe "#with_numbers" do
-    context "empty" do
-      subject { files.with_numbers }
-
-      it { is_expected.to collect_files_with_numbers %w() }
+    it "selects files by numbers" do
+      subject = files.with_numbers %w(bar baz)
+      expect(subject).to collect_files_with_numbers %w(bar baz)
     end
 
-    context "one number" do
-      subject { files.with_numbers("baz") }
-
-      it { is_expected.to collect_files_with_numbers %w(baz) }
+    it "fails when a number is absent" do
+      expect { files.with_numbers(%w(bar baz qux)) }
+        .to raise_error ROM::Migrator::Errors::NotFoundError, /qux/
     end
 
-    context "list of numbers" do
-      subject { files.with_numbers("baz", ["bar"], nil) }
-
-      it { is_expected.to collect_files_with_numbers %w(bar baz) }
-    end
-
-    context "absent number" do
-      subject { files.with_numbers("qux") }
-
-      it "fails" do
-        expect { subject }
-          .to raise_error ROM::Migrator::Errors::NotFoundError, /qux/
-      end
+    it "selects files by existing numbers" do
+      subject = files.with_numbers %w(bar baz qux), false
+      expect(subject).to collect_files_with_numbers %w(bar baz)
     end
   end # describe #with_numbers
 
@@ -108,7 +86,7 @@ describe ROM::Migrator::MigrationFiles do
     it { is_expected.to eql "foo" }
 
     context "when files are absent" do
-      let(:files) { described_class.new }
+      let(:files) { described_class.new [] }
 
       it { is_expected.to eql "" }
     end
@@ -131,6 +109,19 @@ describe ROM::Migrator::MigrationFiles do
         .to match_array [:migration_foo, :migration_bar, :migration_baz]
     end
   end # describe #to_migrations
+
+  describe ".from", :memfs do
+    include_context :migrations
+    subject { described_class.from paths }
+
+    it "creates the collection" do
+      expect(subject).to be_kind_of described_class
+    end
+
+    it "populates the collection with migration files from given folders" do
+      expect(subject.map(&:number)).to contain_exactly("1", "2", "3")
+    end
+  end # describe .from
 
   RSpec::Matchers.define :collect_files_with_numbers do |nums|
     match do |actual|

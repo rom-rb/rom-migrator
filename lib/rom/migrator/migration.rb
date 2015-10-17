@@ -15,7 +15,7 @@ class ROM::Migrator
   #     end
   #   end
   #
-  #   migration = CreateUsers.new(migrator) # using some migrator
+  #   migration = CreateUsers.new(gateway) # using some gateway
   #   migration.apply
   #   migration.reverse
   #
@@ -27,16 +27,11 @@ class ROM::Migrator
   #
   class Migration
 
-    include ROM::Options
-
-    option :number, reader: true
-
-    # @!attribute [r] migrator
-    #
-    # @return [ROM::Migrator]
-    #   The migrator that provides access to persistence and logs the results
-    #
-    attr_reader :migrator
+    include ROM::Options, Errors
+    option :gateway,   reader: true
+    option :logger,    reader: true
+    option :number,    reader: true
+    option :registrar, reader: true
 
     # Gets or sets the block to be called when the migration is applied
     #
@@ -59,11 +54,11 @@ class ROM::Migrator
     end
 
     # @!method initialize(options)
-    # Initializes the migration for some migrator
+    # Initializes the migration for some gateway
     #
-    # The migrator provides custom methods to make changes to persistence.
+    # The gateway provides custom methods to make changes to persistence.
     # Because it calls <potentially> stateful connection
-    # (migration --> migrator --> generator --> connection),
+    # (migration --> gateway --> generator --> connection),
     # a mutex is used for thread safety.
     #
     # When migration is initialized with a number, its appying and reversing
@@ -71,20 +66,19 @@ class ROM::Migrator
     # persistence without any possibility to step back.
     #
     # @param [Hash] options
-    # @option options [ROM::Migrator] :migrator
-    #   Required migrator that provides access to persistence.
-    # @option options [#to_s] :number
-    #   Optional number of the migration.
+    # @option options [ROM::Gateway] gateway
+    #   The gateway that provides access to persistence.
+    # @option options [ROM::Migrator::Registrar] registrar
+    #   The object responcible for registering applied migrations.
     # @option options [::Logger] :logger
-    #   Custom logger to which the migration reports its results
+    #   The logger to store results of migration.
+    # @option options [#to_s] :number
+    #   The optional number of the migration.
     #
-    def initialize(migrator, options = nil)
-      super options
-      @migrator = migrator
-      @up       = self.class.up
-      @down     = self.class.down
-      @mutex    = Mutex.new
-      freeze
+    def initialize(_)
+      super
+      @up   = self.class.up
+      @down = self.class.down
     end
 
     # Applies the migration to persistence
@@ -94,9 +88,8 @@ class ROM::Migrator
     # @return [self] itself
     #
     def apply
-      run_threadsafe_and_log_as :applied do
-        instance_eval(&@up)
-        register(number) if number
+      with_logging(:applied) do
+        registrar.apply(number) { gateway.instance_eval(&@up) }
       end
     end
 
@@ -107,9 +100,8 @@ class ROM::Migrator
     # @return [self] itself
     #
     def reverse
-      run_threadsafe_and_log_as :reversed do
-        instance_eval(&@down)
-        unregister(number) if number
+      with_logging(:reversed) do
+        registrar.reverse(number) { gateway.instance_eval(&@down) }
       end
     end
 
@@ -123,26 +115,13 @@ class ROM::Migrator
 
     private
 
-    def method_missing(*args)
-      @migrator.public_send(*args)
-    end
-
-    def respond_to_missing?(*args)
-      @migrator.respond_to?(*args)
-    end
-
-    def run_threadsafe_and_log_as(done, &block)
-      @mutex.synchronize { run_and_log_as(done, &block) }
-    end
-
-    def run_and_log_as(done)
+    def with_logging(done)
       yield
+      logger.info "The #{self} has been #{done}"
+      self
     rescue => error
       logger.error "The error occured when #{self} was #{done}: #{error}"
       raise
-    else
-      logger.info "The #{self} has been #{done}"
-      self
     end
 
   end # class Migration

@@ -8,7 +8,10 @@ class ROM::Migrator
   #
   module Errors
 
-    require_relative "errors/migration_name_error"
+    require_relative "errors/runtime_error"
+    require_relative "errors/already_applied_error"
+    require_relative "errors/already_reversed_error"
+    require_relative "errors/content_error"
     require_relative "errors/not_found_error"
 
   end # module Errors

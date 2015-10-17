@@ -42,7 +42,7 @@ When creating custom ROM adapter, you should implement its own migrator inherite
 
 and customize it as following:
 
-- provide *adapter-specific* methods to [register applied migrations](#implement-methods-to-register-migrations)
+- provide *adapter-specific* methods to [register applied migrations](#define-how-to-register-migrations)
 - provide *adapter-specific* methods to [make changes to persistence](#implement-methods-to-make-changes-to-persistence) via ROM gateway
 
 You can also redefine some default settings, namely:
@@ -73,55 +73,33 @@ module ROM::CustomAdapter
 end
 ```
 
-### Implement methods to register migrations
+### Define how to register migrations
 
-You MUST define adapter-specific methods, that allow migrator to register/unregister applied migration, and find their numbers.
+You MUST define 4 adapter-specific operations, that allow migrator to register/unregister applied migration, and find their numbers.
 
-Use the `#gateway` to access persistence (all methods not defined by a migrator are forwared to the gateway).
+Blocks are called in the context of the corresponding gateway:
 
 ```ruby
-# Supposet the gateway responds to #send_query
+# Suppose the gateway responds to #send_query
 
 # lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
 
-    # Prepares the table to store applied migrations in a persistence if it is absent.
-    #
-    # @return [undefined]
-    #
-    def prepare_registry
-      # sends to #gateway explicitly
-      gateway.send_query "CREATE TABLE IF NOT EXISTS rom_custom_adapter_migrations;"
+    prepare_registry do
+      send_query "CREATE TABLE IF NOT EXISTS rom_custom_adapter_migrations;"
     end
 
-    # Registers the number of migration being applied
-    #
-    # @param [String] number
-    #
-    # @return [undefined]
-    #
-    def register(number)
-      # implicitly forwards #send_query to #gateway
+    register do |number|
       send_query "INSERT number = '#{number}' INTO rom_custom_adapter_migrations;"
     end
 
-    # Unregisters the number of migration being reversed
-    #
-    # @param [String] number
-    #
-    # @return [undefined]
-    #
-    def unregister(number)
+    unregister do |number|
       send_query "DELETE FROM rom_custom_adapter_migrations WHERE number = '#{number}';"
     end
 
-    # Returns the array of registered numbers of applied migrations
-    #
-    # @return [Array<String>]
-    #
-    def registered
+    registered do
       send_query("SELECT number FROM rom_custom_adapter_migrations;").map(&:number)
     end
   end
@@ -130,22 +108,17 @@ end
 
 You aren't restricted by a gateway as a storage of migrations. The same API can be implemented using a file system or remote server.
 
-### Implement methods to make changes to persistence
-
-Provide methods like `create`, `delete`, `update` etc., that will be accessible to migrations, using the `#gateway` **as the only access point to persistence!**:
+For example you can create / remove a file with a corresponding number inside a special folder:
 
 ```ruby
-# lib/rom-custom_adapter/migrator.rb
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
-    # ...
-    def create_table(name)
-      send_query "CREATE TABLE #{name};"
-    end
+    REGISTRY = "db/migrate/applied_migrations"
 
-    def drop_table(name)
-      send_query "DROP TABLE #{name};"
-    end
+    prepare_registry { FileUtils.mkdir_p REGISTRY }
+    register         { |number| FileUtils.touch "#{ REGISTRY}/.#{ number}" }
+    unregister       { |number| FileUtils.rm_f  "#{ REGISTRY}/.#{ number}" }
+    registered       { Dir["#{ REGISTRY}/.*"].map { |fn| fn[/\.[^.]$/] } }
   end
 end
 ```
@@ -167,7 +140,7 @@ end
 
 ### Customize migration number counter
 
-Reload `#next_migration_number` method, that defines the number of the migration being generated.
+Reload `#default_counter` method, that defines the number of the migration being generated.
 
 By default the number is a timestamp in `%Y%m%d%H%M%S%L` format (17 digits for the current UTC time in milliseconds).
 
@@ -178,16 +151,7 @@ Notice, that migrator will order migrations by *stringified* numbers in the *asc
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ...
-
-    # Returns the sequential number for the next migration
-    #
-    # @param [String, nil] last_number The number of the last existing migration
-    #
-    # @return [#to_s]
-    #
-    def next_migration_number(last_number)
-      last_number.to_i + 1
-    end
+    default_counter { |last_number| last_number.to_i + 1 }
     # ...
   end
 end
@@ -197,11 +161,11 @@ end
 
 The default template is provided by the `rom-migrator` gem.
 
-You can customize the template, for example, to add comments with available methods as shown below. It should be ERB file where `@klass` variable provides the name for the migration class.
+You can customize the template, for example, to add comments with available methods as shown below.
 
 ```
-# lib/rom-custom_adapter/migration.erb
-class <%= @klass %> < ROM::Migrator::Migration
+# lib/rom-custom_adapter/migration.txt
+ROM::Migrator.migration do
   up do
     # create_table(:table_name).set(name: :text, age: :int).primary_key(:name)
   end
@@ -212,8 +176,6 @@ class <%= @klass %> < ROM::Migrator::Migration
 end
 ```
 
-Notice the `Migrator` namespace for the base `Migration` above.
-
 Let the migrator to know a path to the template:
 
 ```ruby
@@ -221,7 +183,7 @@ Let the migrator to know a path to the template:
 module ROM::CustomAdapter
   class Migrator < ROM::Migrator
     # ... 
-    migration_template File.expand_path("../migration.erb", __FILE__)
+    default_template File.expand_path("../migration.txt", __FILE__)
     # ...
   end
 end
@@ -272,6 +234,12 @@ logger = ::Logger.new(::StringIO.new)
 migrator = gateway.migrator logger: logger
 ```
 
+You can customize a template for migrations and a counter as well:
+
+```ruby
+migrator = gateway.migrator template: "config/migration.txt", counter: proc { |_| Time.now.strftime "%Y%m%d%H%M%#{rand(1000..9999)}" }
+```
+
 ### Building inline migration
 
 You can build and apply the migration inline:
@@ -291,7 +259,13 @@ migration.apply   # changes the persistence
 migration.reverse # reverses the changes
 ```
 
-**Be aware** that such a migration has no number. It won't be registered (added to the stored list of applied migrations) and cannot be authomatically reversed after `migration` object is utilized by GC. That's why this method of migration is useful for dev/test only. **Don't use it in production!**
+By default migration number will be provided via counter. You can set the number explicitly:
+
+```ruby
+migrator.migration(number: "1") do
+  # ...
+end
+```
 
 ### Running migrations
 
@@ -317,32 +291,28 @@ migrator.apply target: "20170101234319"
 migrator.reverse target: "20170101234319"
 ```
 
+When reversing a migration you can also use `:allow_missing_files` option. In this case when migrator will try to reverse a number that is absent on disk, it will unregister the number and keep reversion further.
+
+```ruby
+migrator.reverse allow_missing_files: true
+```
+
+Otherwise it will raise an exception complaining it has no recipy how to roll back the migrations.
+
 ### Scaffolding a Migration
 
 Use the `#generator` method to scaffold new migration. You MUST provide the name of the migration class:
 
 ```ruby
-migrator.create_file path: "db/migrate", klass: "Users::CreateUser", number: "1"
-# => `db/migrate/users/1_create_user.rb
-```
-Notice, that a migrator provides nested folders inside the path following the namespace of the `:klass` option.
-
-When the `:path` option hasn't been set explicitly, the migrator will create a file in the first of its paths:
-
-```ruby
-migrator = gateway.new paths: ["db/migrate", "spec/dummy/db/migrate"]
-migrator.create_file klass: "Users::CreateUser", number: "1"
-# => `db/migrate/users/1_create_user.rb
+migrator.create_file
+# => `db/migrate/{next_number}.rb
 ```
 
-When the `:number` option is skipped, the generator will check the content of migrator's paths to find out the number of the last migration, and then use `#next_migration_number` method to count the number for new migration.
+You can customize options: `:path`, `:number` and `:name` for migration, `:logger` and `:template`.
 
 ```ruby
-migrator = gateway.new paths: ["db/migrate", "spec/dummy/db/migrate"]
-# Suppose the maximum number of migrations in folders `db/migrate` and `spec/dummy/db/migrate` is "3",
-# and the `#next_migration_number` increments it by `1`:
-migrator.create_file klass: "users/create_user"
-# => `db/migrate/users/4_create_user.rb
+migrator.create path: "db/migrate/custom", name: "create_users", number: "1"
+# => `db/migrate/custom/1_create_users.rb
 ```
 
 Compatibility

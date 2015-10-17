@@ -1,7 +1,5 @@
 # encoding: utf-8
-
-# Describe what the migration changes in a persistence
-class <%= @klass %> < ROM::Migrator::Migration
+ROM::Migrator.migration
   # Applies the migration
   #
   # @return [undefined]
@@ -15,4 +13,4 @@ class <%= @klass %> < ROM::Migrator::Migration
   #
   down do
   end
-end # class <%= @klass %>
+end

@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-describe ROM::Migrator::Errors::NotFoundError do
+describe ROM::Migrator::Errors::AlreadyAppliedError do
   let(:error) { described_class.new "foo" }
 
   describe ".new" do
@@ -12,7 +12,8 @@ describe ROM::Migrator::Errors::NotFoundError do
   describe "#message" do
     subject { error.message }
 
-    it { is_expected.to eql "Cannot find a migration with number 'foo'" }
+    it { is_expected.to include "migration with number 'foo'" }
+    it { is_expected.to include "has already been applied" }
   end # describe #message
 
-end # describe ROM::Migrator::Errors::NotFoundError
+end # describe ROM::Migrator::Errors::AlreadyAppliedError

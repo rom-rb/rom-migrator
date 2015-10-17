@@ -6,16 +6,14 @@ module ROM::Migrator::Errors
   #
   # @author nepalez <andrew.kozin@gmail.com>
   #
-  class NotFoundError < ::IOError
-
-    include Immutability
+  class NotFoundError < RuntimeError
 
     # Initializes the exception for the wrong number
     #
     # @param [#to_s] number The number of migration
     #
     def initialize(number)
-      super "Cannot find migration with number '#{number}'"
+      super "Cannot find a migration with number '#{number}'"
     end
 
   end # class NotFoundError

@@ -1,119 +1,144 @@
 # encoding: utf-8
 describe ROM::Migrator::Generator do
 
-  let(:generator) { described_class.new migrator, options }
-  let(:migrator)  { double(:migrator).as_null_object }
-  let(:options)   { { path: path, klass: klass, number: number } }
-
-  let(:path)      { "/db/migrate/custom" }
-  let(:klass)     { "cats/create_table" }
-  let(:number)    { nil }
-
-  describe ".call" do
-    let(:generator) { double :generator, call: nil }
-
-    before { allow(described_class).to receive(:new) { generator } }
-    after  { described_class.call migrator, options }
-
-    it "builds and calls the generator" do
-      expect(described_class).to receive(:new).with(migrator, options)
-      expect(generator).to receive(:call)
-    end
-  end # describe .call
+  let(:generator) { described_class.new options }
+  let(:options) do
+    {
+      path:     "/db/migrate/custom",
+      name:     "CreateDalmatines",
+      number:   "101",
+      logger:   frozen_double(:logger, {}).as_null_object,
+      template: "/config/custom_migration.txt"
+    }
+  end
 
   describe ".new" do
     subject { generator }
 
-    context "with a klass name" do
-      it { is_expected.to be_kind_of described_class }
-    end
-
-    context "without klass name" do
-      let(:klass) { nil }
-
-      it "fails" do
-        expect { subject }.to raise_error ROM::Options::InvalidOptionValueError
-      end
-    end
+    it { is_expected.to be_kind_of described_class }
+    it { is_expected.to be_immutable }
   end # describe .new
 
   describe "#path" do
     subject { generator.path }
 
-    it { is_expected.to eql path }
-  end # path
-
-  describe "#klass" do
-    subject { generator.klass }
-
-    it { is_expected.to eql "Cats::CreateTable" }
-  end # describe #klass
-
-  describe "#number" do
-    subject { generator.number }
-
-    it { is_expected.to be_nil }
-
-    context "when set explicitly" do
-      let(:number) { "1" }
-
-      it { is_expected.to eql number }
+    context "when absolute path is given" do
+      it "returns the path" do
+        expect(subject).to eql options[:path]
+      end
     end
-  end # describe #number
 
-  describe "#migrator" do
-    subject { generator.migrator }
+    context "when relative path is given" do
+      before { options[:path] = "../db/migrate/custom" }
 
-    it { is_expected.to eql migrator }
-  end # describe #migrator
+      it "returns the absolute path" do
+        expect(subject).to eql File.expand_path(options[:path])
+      end
+    end
+  end # describe #path
+
+  describe "#template" do
+    subject { generator.template }
+
+    context "when absolute path is given" do
+      it "returns the path" do
+        expect(subject).to eql options[:template]
+      end
+    end
+
+    context "when relative path is given" do
+      before { options[:template] = "../config/custom_migration.txt" }
+
+      it "returns the absolute path" do
+        expect(subject).to eql File.expand_path(options[:template])
+      end
+    end
+  end # describe #template
+
+  describe "#target" do
+    subject { generator.target }
+
+    context "with a name" do
+      it { is_expected.to eql "/db/migrate/custom/101_create_dalmatines.rb" }
+    end
+
+    context "without a name" do
+      before { options.delete(:name) }
+
+      it { is_expected.to eql "/db/migrate/custom/101.rb" }
+    end
+
+    context "from relative path" do
+      before { options[:path] = "./db/migrate/custom" }
+
+      it "returns absolute path" do
+        expect(subject)
+          .to eql File.join(generator.path, "101_create_dalmatines.rb")
+      end
+    end
+  end # describe #target
 
   describe "#call", :memfs do
     subject { generator.call }
 
-    shared_examples :adding_migration_with_number do |num|
-      include_context :custom_template do
-        let(:paths)    { %w(/db/migrate /spec/dummy/db/migrate) }
-        let(:new_path) { "/db/migrate/custom/cats/#{num}_create_table.rb" }
-        let(:content)  { "class Cats::CreateTable < ROM::Migrator::Migration" }
-      end
+    context "in case of success" do
+      include_context :custom_template
 
-      before do
-        allow(migrator).to receive(:next_migration_number, &numerator)
-        allow(migrator).to receive(:paths) { paths }
-        allow(migrator).to receive(:template) { template }
-        allow(migrator).to receive(:logger) { logger }
-      end
-
-      let(:numerator) { proc { |i| "#{i.to_i + 1}m" } }
-      let(:logger)    { double(:logger).as_null_object }
-
-      it "generates first migration" do
+      it "creates target file" do
         subject
-        expect(File).to be_exist new_path
-        expect(File.read(new_path)).to include content
+        expected_content = File.read(template)
+        actual_content   = File.read(generator.target)
+
+        expect(actual_content).to eql expected_content
       end
 
-      it "logs result" do
-        expect(logger)
+      it "logs the result" do
+        expect(options[:logger])
           .to receive(:info)
-          .with "New migration created at '#{new_path}'"
+          .with "New migration created at '#{generator.target}'"
         subject
       end
 
-      it "returns path to migration" do
-        expect(subject).to eql new_path
+      it "returns path to the target" do
+        expect(subject).to eql generator.target
       end
     end
 
-    it_behaves_like :adding_migration_with_number, "1m"
+    context "in case of error" do
+      # expected template is absent
 
-    it_behaves_like :adding_migration_with_number, "4m" do
-      include_context :migrations
-    end
+      it "doesn't create migration file" do
+        subject rescue nil
+        expect(File).not_to exist(generator.target)
+      end
 
-    it_behaves_like :adding_migration_with_number, "5m" do
-      let(:number) { "5m" }
+      it "logs an error" do
+        expect(options[:logger]).to receive(:error) do |text|
+          expect(text).to match(
+            /^Error occured while creating file '#{generator.target}': No such/
+          )
+        end
+        subject rescue nil
+      end
+
+      it "raises the exception" do
+        expect { subject }.to raise_error StandardError
+      end
     end
   end # describe #call
+
+  describe ".call" do
+    subject { described_class.call(options) }
+
+    let(:generator) { double(:generator, call: :foo) }
+
+    it "builds and calls the generator" do
+      allow(described_class).to receive(:new) { generator }
+
+      expect(described_class).to receive(:new).with(options)
+      expect(generator).to receive(:call)
+      expect(subject).to eql generator.call
+    end
+  end # describe .call
 
 end # describe ROM::Migrator::Generator

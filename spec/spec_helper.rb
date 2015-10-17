@@ -16,6 +16,7 @@ require "transproc/rspec"
 require "immutability/rspec"
 
 # Loads some helpers and shared contexts
+require "timecop"
 require "support/memfs"
 require "shared/custom_template"
 require "shared/migrations"

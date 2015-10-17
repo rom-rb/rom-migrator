@@ -1,16 +1,15 @@
 # encoding: utf-8
 
-# Creates file `/config/custom_migration.erb` for a custom template.
+# Creates file `/config/custom_migration.txt` for a custom template.
 shared_context :custom_template do
-  let(:template) { "/config/custom_migration.erb" }
+  let(:template) { "/config/custom_migration.txt" }
 
   before do
     # create folder
     FileUtils.mkdir_p "/config"
 
     File.new(template, "w").write <<-TEXT.gsub(/ *\|/, "")
-      |# This is a custom template
-      |class <%= @klass %> < ROM::Migrator::Migration
+      |ROM::Migrator.migration do
       |  up do
       |  end
       |

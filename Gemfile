@@ -7,3 +7,4 @@ group :metrics do
 end
 
 gem "rom", github: "rom-rb/rom"
+gem "rom-support", github: "nepalez/rom-support"

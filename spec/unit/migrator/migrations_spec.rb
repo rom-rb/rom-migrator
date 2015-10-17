@@ -7,13 +7,6 @@ describe ROM::Migrator::Migrations do
   let(:bar) { double(:migration, number: "bar").as_null_object }
   let(:baz) { double(:migration, number: "baz").as_null_object }
 
-  describe ".new" do
-    subject { migrations }
-
-    it { is_expected.to be_frozen }
-    it { is_expected.not_to be_immutable }
-  end # describe .new
-
   describe "#each" do
     subject { migrations.each }
 

@@ -2,56 +2,42 @@
 
 class ROM::Migrator
 
-  require_relative "migration_file"
-
   # Immutable collection of objects, describing migration files.
-  #
-  # Class factory method [.from] builds the collection of files from an array
-  # of paths to folders, containing migrations.
   #
   # Every item (file) in a collection has its <migration> +number+.
   # The collection knows how to filter files by their numbers,
   # allowing to select migrations to be applied / reversed.
   #
-  # Instance method [#to_migrations] converts the collection of files into
-  # the corresponding collection of instantiated migrations.
-  #
-  # @example Instantiates necessary migrations from given paths
-  #   MigrationFiles
-  #     .from(list_of_paths)            # Convert a list of paths
-  #     .upto_number(target_number)     # with migrations before the target,
-  #     .after_numbers(applied_numbers) # that hasn't been applied yet,
-  #     .to_migrations(                 # into a collection of migrations
-  #       migrator: some_migrator,      # to be applied by some migrator
-  #       logger: custom_logger         # using custom logger.
-  #     )
-  #
   # @api private
   #
   class MigrationFiles
 
-    include Enumerable, Errors, Immutability
+    include ROM::Options, Enumerable, Errors, Immutability
+    option :skip_missing, reader: true
 
-    # Builds the collection of migration files from a list of paths
+    # Builds the collection of valid migration files from a list of paths
+    # to folders containing migrations
     #
-    # @param [String, Array<String>, nil] paths
+    # @param [Array<String>] paths
+    # @param [Hash] options
+    # @option options (see #initialize)
     #
     # @return [ROM::Migrator::MigrationFiles]
     #
-    def self.from(*paths)
-      files = paths.flatten.map do |root|
-        dirs = Dir[File.join(root, "**/*.rb")]
-        dirs.map { |path| MigrationFile.new(root: root, path: path) }
-      end
-      new files
+    def self.from(paths)
+      new paths
+        .flat_map { |folder| Dir[File.join(folder, "**/*.rb")] }
+        .map(&MigrationFile.method(:new))
+        .select(&:valid?)
     end
 
     # Initializes the collection with a list of migration files
     #
     # @param [Array<ROM::Migrator::MigrationFile>] files
     #
-    def initialize(*files)
-      @files = files.flatten
+    def initialize(files)
+      @files = files
+      super options
     end
 
     # Iterates through files
@@ -66,16 +52,15 @@ class ROM::Migrator
 
     # Returns a subset of files with given numbers
     #
-    # @param [String, Array<String>] numbers
-    #
-    # @return [ROM::Migrator::MigrationFiles]
+    # @param [Array<String>] numbers
+    # @param [Boolean] strict Whether missing files can be skipped
     #
     # @raise [ROM::Migrator::Errors::NotFoundError]
     #   when migration with given number is absent
     #
-    def with_numbers(*numbers)
-      numbers = numbers.flatten.compact
-      update { @files = numbers.map(&method(:ensure)) }
+    def with_numbers(numbers, strict = true)
+      numbers = numbers.flatten
+      update { @files = numbers.map { |num| search(num, strict) }.compact }
     end
 
     # Returns a subset of files with numbers greater than given one(s)
@@ -116,16 +101,16 @@ class ROM::Migrator
     #
     # @return [ROM::Migrator::Migrations]
     #
-    def to_migrations(migrator)
-      Migrations.new map { |file| file.to_migration(migrator) }
+    def to_migrations(options)
+      Migrations.new map { |file| file.to_migration(options) }
     end
 
     private
 
-    # Either finds file by number, or fails
-    def ensure(number)
-      detect { |file| file.number.eql? number } ||
-        fail(NotFoundError.new number)
+    def search(number, strict)
+      result = detect { |file| file.number.eql? number }
+      return result if result
+      fail NotFoundError[number] if strict
     end
 
   end # class MigrationFiles

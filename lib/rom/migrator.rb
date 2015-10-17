@@ -6,66 +6,25 @@ require "rom"
 
 module ROM
 
-  require_relative "migrator/functions"       # pure functions
   require_relative "migrator/errors"          # gem-specific errors
-
   require_relative "migrator/logger"          # default logger for migration
+  require_relative "migrator/settings"        # adapter-specific settings
+  require_relative "migrator/registrar"       # registers migrations
   require_relative "migrator/migration"       # changes the persistence
   require_relative "migrator/migrations"      # defines the order of migrations
-  require_relative "migrator/migration_file"  # file description
+  require_relative "migrator/migration_file"  # describes files
   require_relative "migrator/migration_files" # filters files by their numbers
-
-  require_relative "migrator/runner"          # applies / reverses migrations
   require_relative "migrator/generator"       # scaffolds migrations
+  require_relative "migrator/class_dsl"       # sets registrar and settings
 
-  # The abstract base class for ROM migrators
+  # The abstract base class for adapter-specific migrators
   #
-  # The migrator stores all adapter-specific settings
-  # and defines APIwith 3 instance methods to:
+  # The migrator stores all adapter-specific settings and provides methods to:
   # - [#apply] migrations
   # - [#reverse] migrations
-  # - [#create_file] with the next migration
-  #
-  # @example
-  #   class ROM::Custom::Migrator < ROM::Migrator
-  #     # default path to migrations folder
-  #     default_path "db/migrate"
-  #
-  #     # path to adapter-specific template for scaffolding a migration
-  #     template File.expand_path("../template.erb", __FILE__)
-  #
-  #     private
-  #
-  #     # counts number for the next migration
-  #     def next_migration_number(last_number)
-  #       last_number.to_i + 1
-  #     end
-  #
-  #     # returns numbers of applied migrations
-  #     def registered
-  #       call "SELECT number FROM migrations;"
-  #     end
-  #
-  #     # registers new applied migration
-  #     def register(number)
-  #       call "INSERT number '#{number}' INTO migrations;"
-  #     end
-  #
-  #     # unregisters a migration being reversed
-  #     def unregister(number)
-  #       call "DELETE FROM migrations WHERE number='#{number}';"
-  #     end
-  #
-  #     # other function to be accessible from migration's +#up+ and +#down+
-  #     def where(options)
-  #       gateway.where(options)
-  #     end
-  #   end
-  #
-  #   migrator = ROM::Custom::Migrator.new(
-  #     gateway, # some gateway providing access to persistence
-  #     paths: ["db/migrate", "db/custom"] # where migrations live
-  #   )
+  # - [#create_file] with migration
+  # - declare custom [.migration]
+  # - instantiate unnumbered [#migration]
   #
   # @author nepalez <andrew.kozin@gmail.com>
   #
@@ -73,173 +32,114 @@ module ROM
   #
   class Migrator
 
-    NOTHING = Class.new.freeze
-    DEFAULT_PATH = "db/migrate".freeze
-    DEFAULT_TEMPLATE =
-      File.expand_path("../migrator/generator/template.erb", __FILE__).freeze
+    # defines `.settings`, `.registrar` and `.migration`
+    # along with helpers customizing settings and registrar.
+    extend ClassDSL
 
-    # Gets or sets the adapter-specific default path to migrations
-    #
-    # @param [String, nil] value
-    #
-    # @return [String]
-    #
-    def self.default_path(value = NOTHING)
-      @default_path = value unless value.equal?(NOTHING)
-      @default_path || DEFAULT_PATH
-    end
+    # @private
+    attr_reader :gateway, :registrar, :template, :logger, :paths, :counter
 
-    # Gets or sets path to adapter-specific template for migrations
-    #
-    # @param [String] value
-    #
-    # @return [String]
-    #
-    def self.template(value = NOTHING)
-      @template = value unless value.equal?(NOTHING)
-      @template || DEFAULT_TEMPLATE
-    end
-
-    # @!attribute [r] gateway
-    #
-    # @return [ROM::Gateway] the gateway to persistence
-    #
-    attr_reader :gateway
-
-    # @!attribute [r] paths
-    #
-    # @return [String] the list of paths containing migrations
-    #
-    attr_reader :paths
-
-    # @!attribute [r] logger
-    #
-    # @return [::Logger] the logger used to log results of applying migrations
-    #
-    attr_reader :logger
-
-    # Initializes the migrator with reference to the gateway and list of
-    # paths containing migrations.
+    # Initializes the migrator with reference to the gateway.
     #
     # @param [ROM::Gateway] gateway
-    # @option options [Array<#to_s>] :paths
-    #   The list of paths to folders containing migrations.
-    #   Uses [.default_path] by default.
-    # @option options [#to_s] :path
-    #   The same as `:paths` (added for compatibility to 'rom-sql')
+    # @option options [Array<String>] :paths
+    #   Custom paths to migrations
+    # @option options [String] :path
+    #   Custom path to migrations (alternative to :paths)
     # @option options [::Logger] :logger
     #   The custom logger to be used instead of default (that logs to +$stdout+)
     #
     def initialize(gateway, options = {})
-      default  = self.class.default_path
-      @paths   = Array(options[:paths] || options[:path] || default).map(&:to_s)
-      @logger  = options[:logger] || Logger.new
-      @gateway = gateway
-
-      prepare_registry # MUST be defined by adapter
+      default    = self.class.settings
+      @template  = options.fetch(:template) { default.template }
+      @counter   = options.fetch(:counter)  { default.counter }
+      @logger    = options.fetch(:logger)   { default.logger }
+      @paths     = options[:paths] || [options.fetch(:path) { default.path }]
+      @gateway   = gateway
+      @registrar = self.class.registrar.new(gateway)
     end
 
-    # Path to migration's template
+    # Returns a number for the next migration
     #
     # @return [String]
     #
-    def template
-      self.class.template
+    def next_number
+      counter.call(files.last_number).to_s
     end
 
-    # @!method next_migration_number(last_number)
-    # Returns the number for the next migration.
+    # Defines and instantiates unnumbered migration object,
+    # using a block to customize the migration's +up+ and +down+ methods.
     #
-    # By default it provides the current timestamp in milliseconds (17 digits).
-    # It can be reloaded by adapter-specific counter.
-    #
-    # @param [String] last_number The number of the last existing migration
-    #
-    # @return [#to_s]
-    #
-    def next_migration_number(_)
-      Time.now.strftime "%Y%m%d%H%M%S%L"
-    end
-
-    # Defines and instantiates unnamed migration to be applied/reversed
-    #
-    # @param [Proc] block The migration definition (via +up+ and +down+ methods)
+    # @param [Proc] block The block describing a migration
+    # @param [String] number The number for the migration
     #
     # @return [ROM::Migrator::Migration]
     #
-    def migration(&block)
-      Class.new(Migration, &block).new(self)
+    def migration(number = nil, &block)
+      klass = self.class.migration(&block)
+      klass.new migration_options.merge(number: number || next_number)
     end
 
     # Applies migrations
     #
-    # @param  (see ROM::Migrator::Runner.apply)
-    # @option (see ROM::Migrator::Runner.apply)
+    # @param [Hash] options
+    # @option options [nil, #to_s] :target The target version
     #
-    # @return [self] itself
+    # @return [undefined]
     #
     def apply(options = {})
-      run :apply, options
+      target = options[:target]
+      files
+        .after_numbers(registrar.registered)
+        .upto_number(target)
+        .to_migrations(migration_options)
+        .apply
     end
 
+    # @!method reverse(target = nil, options = {})
     # Reverses migrations
     #
-    # @param  (see ROM::Migrator::Runner.reverse)
-    # @option (see ROM::Migrator::Runner.reverse)
+    # @param [Hash] options
+    # @option options [nil, #to_s] :target The target version
+    # @option options [Boolean] :allow_missing_files
+    #   Whether reversion should continue if some registered files are missed
     #
-    # @return [self] itself
+    # @return [undefined]
     #
     def reverse(options = {})
-      run :reverse, options
+      target, skip = options.values_at(:target, :allow_missing_files)
+      files
+        .with_numbers(registrar.registered, !skip)
+        .after_numbers(target)
+        .to_migrations(migration_options)
+        .reverse
     end
 
     # Generates the migration
-    #
-    # @example Generates migation
-    #   migrator.create_file(
-    #     path:   "spec/dummy/db/migrate",
-    #     klass:  "Users::Create",
-    #     number: "1"
-    #   )
-    #   # => "spec/dummy/db/migrate/users/1_create.rb"
-    #
-    # @example Uses the first of migration paths by default
-    #   migrator = gateway.migrator paths: ["db/migrate", "spec/dummy/db"]
-    #   migrator.create_file(
-    #     klass:  "Users::Create",
-    #     number: "1"
-    #   )
-    #   # => "db/migrate/users/1_create.rb"
-    #
-    # @example Provides the number using [#next_migration_number]
-    #   migrator.create_file(
-    #     path:   "db/migrate",
-    #     klass:  "Users::Create"
-    #   )
-    #   # => "db/migrate/users/20151012134401892_create.rb"
     #
     # @param [Hash] options
     # @option (see ROM::Migrator::Generator.call)
     #
     # @return (see ROM::Migrator::Generator.call)
     #
-    def create_file(options)
-      Generator.call self, { path: paths.first }.merge(options)
+    def create_file(options = {})
+      defaults = {
+        path:     paths.first,
+        logger:   logger,
+        template: template,
+        number:   next_number
+      }
+      Generator.call defaults.merge(options)
     end
 
     private
 
-    def run(command, options)
-      Runner.public_send command, self, options
-      self
+    def files
+      MigrationFiles.from paths
     end
 
-    def method_missing(*args)
-      gateway.public_send(*args)
-    end
-
-    def respond_to_missing?(name, *)
-      gateway.respond_to? name
+    def migration_options
+      { gateway: gateway, logger: logger, registrar: registrar }
     end
 
   end # class Migrator

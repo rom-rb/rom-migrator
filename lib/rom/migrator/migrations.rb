@@ -10,7 +10,7 @@ class ROM::Migrator
   #
   class Migrations
 
-    include Enumerable, Errors
+    include Enumerable
 
     # Initializes a collection by array of migrations
     #
@@ -18,7 +18,6 @@ class ROM::Migrator
     #
     def initialize(*migrations)
       @migrations = migrations.flatten
-      freeze # shallow because of possible mitability of migrator in migrations
     end
 
     # Iterates through migrations

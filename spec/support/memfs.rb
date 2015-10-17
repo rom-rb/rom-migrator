@@ -8,6 +8,10 @@ RSpec.configure do |c|
       ROM::Migrator::MigrationFile.send :define_method, :require do |name|
         eval File.read(name)
       end
+      # This is a hack for #require to use a fake FS
+      ROM::Migrator::MigrationFile.send :define_method, :load do |name|
+        require name
+      end
 
       example.run
     end

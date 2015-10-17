@@ -3,11 +3,15 @@ describe ROM::Migrator::Migration do
 
   let(:klass)     { Class.new(described_class) }
   let(:block)     { proc { go :foo } }
+  let(:migration) { klass.new(options) }
 
-  let(:migration) { klass.new(migrator, number: number) }
-  let(:number)    { "foo" }
+  let(:options) do
+    { gateway: gateway, registrar: registrar, logger: logger, number: number }
+  end
+  let(:gateway)   { double(:gateway).as_null_object }
+  let(:registrar) { double(:registrar).as_null_object }
   let(:logger)    { double(:logger).as_null_object }
-  let(:migrator)  { double(:migrator, go: :BAZ, logger: logger).as_null_object }
+  let(:number)    { "foo" }
 
   describe ".up" do
     subject { klass.up(&block) }
@@ -25,36 +29,32 @@ describe ROM::Migrator::Migration do
     end
   end # describe .down
 
-  describe ".new" do
-    subject { klass.new migrator }
+  describe "#to_s" do
+    subject { migration.to_s }
 
-    it { is_expected.to be_frozen }
-    it { is_expected.not_to be_immutable }
-  end # describe .new
-
-  describe "#number" do
-    subject { migration.number }
-
-    it { is_expected.to eql number }
-
-    context "when not provided" do
-      let(:migration) { klass.new migrator }
-
-      it { is_expected.to be_nil }
+    context "with number" do
+      it { is_expected.to eql "migration number 'foo'" }
     end
-  end # describe #number
+
+    context "without number" do
+      let(:number) { nil }
+
+      it { is_expected.to eql "migration" }
+    end
+  end # describe #to_s
 
   describe "#apply" do
+    before  { allow(registrar).to receive(:apply).and_yield }
     before  { klass.up(&block) }
     subject { migration.apply }
 
-    it "evaluates .up in the migrator's scope" do
-      expect(migrator).to receive(:go).with :foo
+    it "unregisters the number" do
+      expect(registrar).to receive(:apply).with(number)
       subject
     end
 
-    it "registers the number" do
-      expect(migrator).to receive(:register).with(number).once
+    it "evaluates .up in the gateway's scope" do
+      expect(gateway).to receive(:go).with :foo
       subject
     end
 
@@ -69,29 +69,26 @@ describe ROM::Migrator::Migration do
       expect(subject).to eql migration
     end
 
-    context "when number isn't set" do
-      let(:number) { nil }
+    context "when registrar fails" do
+      before { allow(registrar).to receive(:apply) { fail } }
 
-      it "doesn't register a number" do
-        expect(migrator).not_to receive(:register)
-        subject
+      it "doesn't evaluate .up" do
+        expect(gateway).not_to receive(:go)
+        subject rescue nil
       end
 
-      it "logs the result w/o number" do
-        expect(logger)
-          .to receive(:info)
-          .with "The migration has been applied"
-        subject
+      it "logs the error" do
+        expect(logger).to receive(:error)
+        subject rescue nil
+      end
+
+      it "raises the error" do
+        expect { subject }.to raise_error RuntimeError
       end
     end
 
-    context "in case of error" do
-      let(:block) { proc { fail RuntimeError.new "something went wrong" } }
-
-      it "doesn't register the number" do
-        expect(migrator).not_to receive(:register)
-        subject rescue nil
-      end
+    context "when gateway fails" do
+      before { allow(gateway).to receive(:go) { fail "something went wrong" } }
 
       it "logs the error" do
         expect(logger)
@@ -108,16 +105,17 @@ describe ROM::Migrator::Migration do
   end # describe #apply
 
   describe "#reverse" do
+    before  { allow(registrar).to receive(:reverse).and_yield }
     before  { klass.down(&block) }
     subject { migration.reverse }
 
-    it "evaluates .down in the migrator's scope" do
-      expect(migrator).to receive(:go).with :foo
+    it "unregisters the number" do
+      expect(registrar).to receive(:reverse).with(number)
       subject
     end
 
-    it "unregisters the number" do
-      expect(migrator).to receive(:unregister).with(number).once
+    it "evaluates .down in the gateway's scope" do
+      expect(gateway).to receive(:go).with :foo
       subject
     end
 
@@ -132,29 +130,26 @@ describe ROM::Migrator::Migration do
       expect(subject).to eql migration
     end
 
-    context "when number isn't set" do
-      let(:number) { nil }
+    context "when registrar fails" do
+      before { allow(registrar).to receive(:reverse) { fail } }
 
-      it "doesn't unregister a number" do
-        expect(migrator).not_to receive(:unregister)
-        subject
+      it "doesn't evaluate .down" do
+        expect(gateway).not_to receive(:go)
+        subject rescue nil
       end
 
-      it "logs the result w/o number" do
-        expect(logger)
-          .to receive(:info)
-          .with "The migration has been reversed"
-        subject
+      it "logs the error" do
+        expect(logger).to receive(:error)
+        subject rescue nil
+      end
+
+      it "raises the error" do
+        expect { subject }.to raise_error RuntimeError
       end
     end
 
-    context "in case of error" do
-      let(:block) { proc { fail RuntimeError.new "something went wrong" } }
-
-      it "doesn't unregister the number" do
-        expect(migrator).not_to receive(:unregister)
-        subject rescue nil
-      end
+    context "when gateway fails" do
+      before { allow(gateway).to receive(:go) { fail "something went wrong" } }
 
       it "logs the error" do
         expect(logger)
@@ -169,28 +164,5 @@ describe ROM::Migrator::Migration do
       end
     end
   end # describe #reverse
-
-  describe "#method_missing" do
-    subject { migration.go(:bar) }
-
-    it "forwards to #migrator" do
-      expect(migrator).to receive(:go).with(:bar)
-      expect(subject).to eql :BAZ
-    end
-  end # describe #arbitrary_method
-
-  describe "#respond_to?" do
-    subject { migration.respond_to? :go }
-
-    context "method provided by #migrator" do
-      it { is_expected.to eql true }
-    end
-
-    context "method not provided by #migrator" do
-      let(:migrator) { double :migrator }
-
-      it { is_expected.to eql false }
-    end
-  end # describe #respond_to?
 
 end # describe ROM::Migrator::Migration

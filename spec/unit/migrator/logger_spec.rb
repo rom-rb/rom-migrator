@@ -14,8 +14,10 @@ describe ROM::Migrator::Logger do
 
     it { is_expected.not_to be_frozen }
 
-    it "sends messages to $stdout" do
-      expect { subject.info "text" }.to change { stdout.string }.to "text\n"
+    it "sends formatted messages to $stdout" do
+      expect { subject.info "foo\nbar\nbaz" }
+        .to change { stdout.string }
+        .to "foo\n  bar\n  baz\n"
     end
   end # describe .new
 

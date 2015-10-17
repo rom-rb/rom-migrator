@@ -1,57 +1,28 @@
 # encoding: utf-8
 
-require "rom"
-require "timecop"
-
 describe ROM::Migrator do
 
-  let(:klass)     { Class.new(described_class) { def prepare_registry; end } }
-  let(:runner)    { ROM::Migrator::Runner }
+  let(:klass)     { Class.new(described_class) }
   let(:generator) { ROM::Migrator::Generator }
-  let(:migrator)  { klass.new gateway, paths: paths, logger: logger }
-  let(:gateway)   { double :gateway, foo: :qux }
-  let(:paths)     { ["db/migrate", "spec/dummy/db/migrate"] }
-  let(:logger)    { double(:logger).as_null_object }
+  let(:migrator)  { klass.new gateway, options }
 
-  describe ".default_path" do
-    it "gets/sets custom path" do
-      expect { klass.default_path "custom" }
-        .to change { klass.default_path }
-        .from("db/migrate")
-        .to("custom")
-    end
-  end # describe .adapter
+  let(:gateway) { double(:gateway).as_null_object }
+  let(:options) { { logger: logger, path: path, counter: counter } }
+  let(:logger)  { Logger.new StringIO.new }
+  let(:counter) { -> prev { prev.to_i + 2 } }
+  let(:path)    { "/db/migrate" }
 
-  describe ".template" do
-    let(:default) { File.join ROOT, "lib/rom/migrator/generator/template.erb" }
-
-    it "gets/sets path to template" do
-      expect { klass.template "custom" }
-        .to change { klass.template }
-        .from(default)
-        .to("custom")
-    end
-  end # describe .adapter
+  it "uses the DSL" do
+    expect(klass).to be_kind_of ROM::Migrator::ClassDSL
+  end
 
   describe ".new" do
-    before do
-      klass.send(:define_method, :prepare_registry) { @registry = :ok }
-    end
+    subject { klass.new(gateway) }
 
-    it "prepares versions registry" do
-      expect(migrator.instance_variable_get :@registry).to eql :ok
+    it "can skip options" do
+      expect { subject }.not_to raise_error
     end
   end # describe .new
-
-  describe "#template" do
-    subject { migrator.template }
-
-    it "is set from class" do
-      klass.template "custom"
-
-      expect(subject).to eql "custom"
-    end
-  end # describe #template
 
   describe "#gateway" do
     subject { migrator.gateway }
@@ -59,29 +30,51 @@ describe ROM::Migrator do
     it { is_expected.to eql gateway }
   end # describe #gateway
 
+  describe "#registrar" do
+    subject { migrator.registrar }
+
+    it "instantiates customized registrar" do
+      expect(subject).to be_kind_of klass.registrar
+    end
+
+    it "uses the gateway" do
+      expect(subject.gateway).to eql gateway
+    end
+  end # describe #registrar
+
+  describe "#logger" do
+    subject { migrator.logger }
+
+    it { is_expected.to eql logger }
+
+    context "by default" do
+      before { options.delete :logger }
+
+      it "uses default logger" do
+        expect(subject).to eql klass.settings.logger
+      end
+    end
+  end # describe #logger
+
   describe "#paths" do
     subject { migrator.paths }
 
+    context "when single path is set" do
+      it { is_expected.to eql [path] }
+    end
+
     context "when list of paths is set" do
+      before { options[:paths] = paths }
+
+      let(:paths) { %w(foo bar) }
+
       it { is_expected.to eql paths }
     end
 
-    context "when single path is set" do
-      let(:migrator) { klass.new gateway, path: "custom" }
+    context "by default" do
+      before { options.delete :path }
 
-      it { is_expected.to eql ["custom"] }
-    end
-
-    context "when pathname is set" do
-      let(:migrator) { klass.new gateway, path: Pathname("custom") }
-
-      it { is_expected.to eql ["custom"] }
-    end
-
-    context "when no paths are set" do
-      let(:migrator) { klass.new gateway }
-
-      it "is taken from ::default_path" do
+      it "uses default path" do
         klass.default_path "custom"
 
         expect(subject).to eql ["custom"]
@@ -89,147 +82,183 @@ describe ROM::Migrator do
     end
   end # describe #default_path
 
-  describe "#logger" do
-    subject { migrator.logger }
+  describe "#counter" do
+    subject { migrator.counter[1] }
 
-    it { is_expected.to eql logger }
+    it { is_expected.to eql(3) }
 
-    context "when not provided" do
-      let(:logger) { nil }
+    context "by default" do
+      before { options.delete :counter }
 
-      it "uses default logger" do
-        expect(subject).to be_kind_of ROM::Migrator::Logger
+      it "uses default counter" do
+        time = Time.new(2015, 12, 2, 8, 23, 42.8982)
+        Timecop.freeze(time) { expect(subject).to eql "20151202082342898" }
       end
     end
-  end # describe #logger
+  end # describe #counter
 
-  describe "#next_migration_number" do
-    subject { migrator.next_migration_number("1") }
+  describe "#next_number", :memfs do
+    include_context :migrations
+    subject { migrator.next_number }
 
-    let(:time) { Time.utc(2017, 9, 10, 21, 30, 15.0394) }
-
-    it "returns the current UTC timestamp accurate to milliseconds" do
-      Timecop.freeze(time) do
-        expect(subject).to eql "20170910213015039"
-      end
+    it "applies #counter to existing migrations" do
+      expect(subject).to eql "5"
     end
-  end # describe #next_migration_number
-
-  describe "#apply" do
-    before  { allow(runner).to receive(:apply) }
-
-    context "with options" do
-      subject { migrator.apply options }
-
-      let(:options) { { target: "109" } }
-
-      it "works" do
-        expect(runner).to receive(:apply).with(migrator, options)
-        expect(subject).to eql migrator
-      end
-    end
-
-    context "without options" do
-      subject { migrator.apply }
-
-      it "works" do
-        expect(runner).to receive(:apply).with(migrator, {})
-        expect(subject).to eql migrator
-      end
-    end
-  end # describe #apply
-
-  describe "#reverse" do
-    before  { allow(runner).to receive(:reverse) }
-
-    context "with options" do
-      subject { migrator.reverse options }
-
-      let(:options) { { target: "109" } }
-
-      it "works" do
-        expect(runner).to receive(:reverse).with(migrator, options)
-        expect(subject).to eql migrator
-      end
-    end
-
-    context "without options" do
-      subject { migrator.reverse }
-
-      it "works" do
-        expect(runner).to receive(:reverse).with(migrator, {})
-        expect(subject).to eql migrator
-      end
-    end
-  end # describe #reverse
+  end # describe #next_number
 
   describe "#create_file" do
-    subject { migrator.create_file options }
-    before  { allow(generator).to receive(:call) { "new_file.rb" } }
+    around { |example| Timecop.freeze { example.run } }
+    before { allow(generator).to receive(:call) { "new_file.rb" } }
 
-    context "with path" do
-      let(:options) { { path: "custom", klass: "Foo::Bar", number: "3" } }
+    context "by default" do
+      subject { migrator.create_file }
 
-      it "builds and calls a generator" do
-        expect(generator)
-          .to receive(:call)
-          .with(migrator, options)
+      let(:default_options) do
+        {
+          template: migrator.template,
+          number:   migrator.next_number,
+          path:     migrator.paths.first,
+          logger:   migrator.logger
+        }
+      end
+
+      it "builds and calls a generator with default options" do
+        expect(generator).to receive(:call).with default_options
         expect(subject).to eql "new_file.rb"
       end
     end
 
-    context "without paths" do
-      let(:options) { { klass: "Foo::Bar", number: "3" } }
+    context "with options" do
+      subject { migrator.create_file(explicit_options) }
 
-      it "builds and calls a generator with the first folder" do
-        expect(generator)
-          .to receive(:call)
-          .with(migrator, options.merge(path: "db/migrate"))
+      let(:explicit_options) do
+        { template: "/foo/bar", number: "1", path: "/baz/qux", logger: logger }
+      end
+
+      it "builds and calls a generator using options" do
+        expect(generator).to receive(:call).with explicit_options
         expect(subject).to eql "new_file.rb"
       end
     end
   end # describe #create_file
 
   describe "#migration" do
-    subject { migrator.migration { up { :foo } } }
+    around { |example| Timecop.freeze { example.run } }
+    subject { migrator.migration("foo") { up { :foo } } }
 
     it "provides custom migration" do
       expect(subject).to be_kind_of ROM::Migrator::Migration
       expect(subject.class.up.call).to eql :foo
     end
 
-    it "uses current migrator" do
-      expect(subject.migrator).to eql migrator
+    it "uses current logger and registrar" do
+      expect(subject.logger).to eql migrator.logger
+      expect(subject.registrar).to eql migrator.registrar
     end
 
-    it "doesn't set the migration number" do
-      expect(subject.number).to be_nil
+    it "uses the number" do
+      expect(subject.number).to eql "foo"
+    end
+
+    context "without a number" do
+      subject { migrator.migration { up { :foo } } }
+
+      it "uses the next number" do
+        expect(subject.number).to eql migrator.next_number
+      end
     end
   end # describe #migration
 
-  describe "#method_missing" do
-    subject { migrator.foo :bar, :baz }
+  describe "#apply", :memfs do
+    include_context :migrations
+    before { options[:paths] = %w(/db/migrate /spec/dummy/db/migrate) }
+    before { allow(migrator.registrar).to receive(:registered) { %w(1) } }
 
-    it "forwards unknown methods to #gateway" do
-      expect(gateway).to receive(:foo).with(:bar, :baz)
-      expect(subject).to eql :qux
+    context "without :target option" do
+      after { migrator.apply }
+
+      it "applies all non-registered migrations" do
+        expect(gateway).not_to receive(:go).with "CREATE TABLE users;"
+        expect(gateway).to receive(:go).with("CREATE TABLE roles;").ordered
+        expect(gateway).to receive(:go).with("CREATE TABLE accounts;").ordered
+      end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).twice
+      end
     end
-  end # describe #method_missing
 
-  describe "#respond_to_missing?" do
-    subject { migrator.respond_to? name }
+    context "with :target option" do
+      after { migrator.apply target: "2" }
 
-    context "method known to #gateway" do
-      let(:name) { :foo }
+      it "applies non-registered migrations up to the target" do
+        expect(gateway).not_to receive(:go).with "CREATE TABLE users;"
+        expect(gateway).to receive(:go).with("CREATE TABLE roles;")
+        expect(gateway).not_to receive(:go).with("CREATE TABLE accounts;")
+      end
 
-      it { is_expected.to eql true }
+      it "logs the results" do
+        expect(logger).to receive(:info).once
+      end
+    end
+  end # describe #apply
+
+  describe "#reverse", :memfs do
+    include_context :migrations
+    before { options[:paths] = %w(/db/migrate /spec/dummy/db/migrate) }
+    before { allow(migrator.registrar).to receive(:registered) { %w(1 2) } }
+
+    context "without :target option" do
+      after { migrator.reverse }
+
+      it "reverses all registered migrations" do
+        expect(gateway).not_to receive(:go).with "DROP TABLE accounts;"
+        expect(gateway).to receive(:go).with("DROP TABLE roles;").ordered
+        expect(gateway).to receive(:go).with("DROP TABLE users;").ordered
+      end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).twice
+      end
     end
 
-    context "method unknown to #gaeway" do
-      let(:name) { :quxx }
+    context "with :target option" do
+      after { migrator.reverse target: "1" }
 
-      it { is_expected.to eql false }
+      it "reverses migrations, registered after the target" do
+        expect(gateway).not_to receive(:go).with "DROP TABLE accounts;"
+        expect(gateway).to receive(:go).with("DROP TABLE roles;").ordered
+        expect(gateway).not_to receive(:go).with("DROP TABLE users;")
+      end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).once
+      end
     end
-  end # describe #respond_to?
+
+    context "without :allow_missing_files option" do
+      subject { migrator.reverse }
+      before { allow(migrator.registrar).to receive(:registered) { %w(1 2 5) } }
+
+      it "fails" do
+        expect { subject }.to raise_error RuntimeError
+      end
+    end
+
+    context "with :allow_missing_files option" do
+      after { migrator.reverse allow_missing_files: true }
+      before { allow(migrator.registrar).to receive(:registered) { %w(1 2 5) } }
+
+      it "reverses migrations" do
+        expect(gateway).not_to receive(:go).with "DROP TABLE accounts;"
+        expect(gateway).to receive(:go).with("DROP TABLE roles;").ordered
+        expect(gateway).to receive(:go).with("DROP TABLE users;").ordered
+      end
+
+      it "logs the results" do
+        expect(logger).to receive(:info).twice
+      end
+    end
+  end # describe #reverse
 
 end # describe ROM::Migrator

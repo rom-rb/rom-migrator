@@ -15,7 +15,7 @@ class ROM::Migrator
     #
     def initialize
       super $stdout
-      self.formatter = proc { |_, _, _, message| "#{message}\n" }
+      self.formatter = -> _, _, _, message { "#{message.lines.join("  ")}\n" }
     end
 
   end # Logger
