@@ -116,9 +116,9 @@ module ROM::CustomAdapter
     REGISTRY = "db/migrate/applied_migrations"
 
     prepare_registry { FileUtils.mkdir_p REGISTRY }
-    register         { |number| FileUtils.touch "#{ REGISTRY}/.#{ number}" }
-    unregister       { |number| FileUtils.rm_f  "#{ REGISTRY}/.#{ number}" }
-    registered       { Dir["#{ REGISTRY}/.*"].map { |fn| fn[/\.[^.]$/] } }
+    register         { |number| FileUtils.touch "#{REGISTRY}/.#{number}" }
+    unregister       { |number| FileUtils.rm_f  "#{REGISTRY}/.#{number}" }
+    registered       { Dir["#{REGISTRY}/.*"].map { |fn| fn[/\.[^.]$/] } }
   end
 end
 ```
