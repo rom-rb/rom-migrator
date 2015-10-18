@@ -40,7 +40,8 @@ class ROM::Migrator
     # @return [Proc]
     #
     def self.up(&block)
-      block ? (@up = block) : @up
+      @up = block if block
+      @up || proc {}
     end
 
     # Gets or sets the block to be called when the migration is reversed
@@ -50,7 +51,8 @@ class ROM::Migrator
     # @return [Proc]
     #
     def self.down(&block)
-      block ? (@down = block) : @down
+      @down = block if block
+      @down || proc {}
     end
 
     # @!method initialize(options)

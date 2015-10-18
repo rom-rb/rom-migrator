@@ -1,104 +1,136 @@
 # encoding: utf-8
 describe ROM::Migrator::MigrationFile do
 
-  let(:file) { described_class.new path }
-  let(:path) { double to_s: "foo/bar.rb" }
+  let(:source)  { described_class.new options }
+  let(:options) { { number: number, content: content } }
+  let(:number)  { :"12" }
+  let(:content) { "ROM::Migrator.migration { up { :foo } }" }
 
   describe ".new" do
-    subject { file }
+    subject { source }
 
-    it { is_expected.to be_kind_of described_class }
     it { is_expected.to be_immutable }
   end # describe .new
 
+  describe ".from_file", :memfs do
+    include_context :migrations
+    subject { described_class.from_file(path) }
+
+    context "when file is present" do
+      let(:path) { "/db/migrate/1_create_users.rb" }
+
+      it "instantiates a source" do
+        expect(subject).to be_kind_of described_class
+      end
+
+      it "takes number from path" do
+        expect(subject.number).to eql "1"
+      end
+
+      it "takes content from file" do
+        expect(subject.content).to eql File.read(path)
+      end
+    end
+
+    context "when file is absent" do
+      let(:path) { "/db/migrate/0.rb" }
+
+      it "fails" do
+        expect { subject }
+          .to raise_error ROM::Migrator::Errors::NotFoundError, /'0'/
+      end
+    end
+  end # describe .from_file
+
   describe "#number" do
-    subject { file.number }
+    subject { source.number }
 
-    context "from long name" do
-      let(:path) { "foo/bar_baz_qux.rb" }
-
-      it { is_expected.to eql "bar" }
-    end
-
-    context "from short name" do
-      let(:path) { "foo/bar.rb" }
-
-      it { is_expected.to eql "bar" }
-    end
+    it { is_expected.to eql number.to_s }
   end # describe #number
 
-  describe "#valid?", :memfs do
-    include_context :migrations
-    subject { file.valid? }
+  describe "#content" do
+    subject { source.content }
 
-    context "with valid migration" do
-      let(:path) { "/db/migrate/1_create_users.rb" }
+    it { is_expected.to eql content }
+
+    context "by default" do
+      before { options.delete :content }
+
+      it { is_expected.to eql "ROM::Migrator.migration" }
+    end
+  end # describe #content
+
+  describe "#valid?" do
+    subject { source.valid? }
+
+    context "with valid number and anonymous migration" do
+      let(:content) { "ROM::Migrator.migration" }
 
       it { is_expected.to eql true }
     end
 
-    context "with migration w/o number" do
-      let(:path) { "/db/migrate/_unnumbered.rb" }
+    context "with valid number and subclassed migration" do
+      let(:content) { "ROM::SQL::Migrator.migration" }
+
+      it { is_expected.to eql true }
+    end
+
+    context "with valid number and subclassed migration" do
+      let(:content) { "class Foo < ROM::Migrator::Migration" }
+
+      it { is_expected.to eql true }
+    end
+
+    context "with valid number and subclassed migration" do
+      let(:content) { "Foo = Class.new(ROM::Migrator::Migration)" }
+
+      it { is_expected.to eql true }
+    end
+
+    context "with invalid content" do
+      let(:content) { "class Foo" }
 
       it { is_expected.to eql false }
     end
 
-    context "when a file doesn't define a migration" do
-      let(:path) { "/db/migrate/4_not_a_migration.rb" }
-
-      it { is_expected.to eql false }
-    end
-
-    context "when a file is absent" do
-      let(:path) { "/db/migrate/6_absent.rb" }
+    context "with empty number" do
+      let(:number) { "" }
 
       it { is_expected.to eql false }
     end
   end # describe #valid?
 
-  describe "#to_migration", :memfs do
-    include_context :migrations
-    let(:path) { "/db/migrate/1_create_users.rb" }
+  describe "#to_migration" do
+    subject { source.to_migration(args) }
+    let(:args) { { gateway: double, logger: double, registrar: double } }
 
-    subject { file.to_migration options }
-    let(:options) { { gateway: double, logger: double, registrar: double } }
-
-    it "builds the migration" do
+    it "builds custom migration" do
       expect(subject).to be_kind_of ROM::Migrator::Migration
-      expect(subject.options).to eql options.merge(number: "1")
+      expect(subject.options).to eql args.merge(number: number.to_s)
+      expect(subject.class.up.call).to eql :foo
     end
 
-    context "when a file cannot be loaded" do
-      let(:path) { "/db/migrate/4_not_a_migration.rb" }
-
-      it "fails" do
-        expect { subject }.to raise_error(
-          ROM::Migrator::Errors::ContentError,
-          /4_not_a_migration(.|\n)+undefined method/
-        )
+    shared_examples :raising_content_error do
+      it "[fails]" do
+        expect { subject }
+          .to raise_error ROM::Migrator::Errors::ContentError, /'#{number}'/
       end
     end
 
-    context "when a file loads not a class" do
-      let(:path) { "/db/migrate/5_symbol.rb" }
-
-      it "fails" do
-        expect { subject }.to raise_error(
-          ROM::Migrator::Errors::ContentError,
-          /5_symbol(.|\n)+ :foo/
-        )
-      end
+    it_behaves_like :raising_content_error do
+      let(:number) { "" }
     end
 
-    context "when a file loads non-migration class" do
-      let(:path) { "/db/migrate/6_symbol_class.rb" }
+    it_behaves_like :raising_content_error do
+      let(:content) { "ROM::Migrator.migration; WTF?!" }
+    end
 
-      it "fails" do
-        expect { subject }.to raise_error(
-          ROM::Migrator::Errors::ContentError,
-          /6_symbol_class(.|\n)+ Symbol/
-        )
-      end
+    it_behaves_like :raising_content_error do
+      let(:content) { "ROM::Migrator.migration; String" }
+    end
+
+    it_behaves_like :raising_content_error do
+      let(:content) { "ROM::Migrator.migration; nil" }
     end
   end # describe #to_migration
 

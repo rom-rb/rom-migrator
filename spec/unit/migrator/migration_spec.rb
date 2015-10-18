@@ -17,7 +17,12 @@ describe ROM::Migrator::Migration do
     subject { klass.up(&block) }
 
     it "gets or sets the proc" do
-      expect { subject }.to change { klass.up }.from(nil).to(block)
+      expect { subject }.to change { klass.up }.to(block)
+    end
+
+    it "returns empty proc by default" do
+      expect(klass.up).to be_kind_of Proc
+      expect(klass.up.call).to be_nil
     end
   end # describe .up
 
@@ -25,7 +30,12 @@ describe ROM::Migrator::Migration do
     subject { klass.down(&block) }
 
     it "gets or sets the proc" do
-      expect { subject }.to change { klass.down }.from(nil).to(block)
+      expect { subject }.to change { klass.down }.to(block)
+    end
+
+    it "returns empty proc by default" do
+      expect(klass.up).to be_kind_of Proc
+      expect(klass.up.call).to be_nil
     end
   end # describe .down
 

@@ -20,30 +20,34 @@ class ROM::Migrator
   #
   class MigrationFile
 
-    include Errors, Immutability
+    include ROM::Options, Errors, Immutability
+    option :number,  reader: true, coercer: -> num { num.to_s }
+    option :content, reader: true, default: "ROM::Migrator.migration"
 
-    # @!attribute [r] number
+    # Loads the migration file from disk
     #
-    # @return [String] The version number of the migration
+    # @param [String] path
     #
-    attr_reader :number
+    # @return [ROM::Migrator::MigrationFile]
+    #
+    def self.from_file(path)
+      number = Pathname.new(path).basename(".rb").to_s[/^[^_]+/]
+      fail NotFoundError.new(number) unless File.exist? path
+      content = File.read(path)
 
-    # Initializes the object with absolute path to migration
-    #
-    # @param [#to_s] path The full path to migration file
-    #
-    def initialize(path)
-      @path    = path.to_s
-      @content = content
-      @number  = set_number
+      new(number: number, content: content)
     end
 
-    # Checks whether the file is a valid migration
+    # Checks whether the content describes a migration
+    #
+    # Used to skip files that are definitely not a migrations.
+    # The check is preliminary: content evaluation still can raise an error.
     #
     # @return [Boolean]
     #
     def valid?
-      (number && check_content) ? true : false
+      return false if number.empty?
+      !content[/ROM::([A-Z][A-z]*::)?Migrator(\.m|::M)igration/].nil?
     end
 
     # Loads the file and initializes the migration it describes
@@ -53,41 +57,27 @@ class ROM::Migrator
     # @return [ROM::Migrator::Migration]
     #
     def to_migration(options)
-      klass.new options.merge(number: number)
+      raise_error unless valid?
+      migration_klass.new options.merge(number: number)
     end
 
     private
 
-    def content
-      File.read(@path)
-    rescue
-      ""
-    end
-
-    def klass
-      result = eval(@content)
-    rescue => error
-      raise_error(error)
+    def migration_klass
+      klass = eval(@content)
+    rescue StandardError, SyntaxError
+      raise_error
     else
-      raise_error(result) unless subclass_of_migration?(result)
-      result
+      raise_error unless subclass_of_migration?(klass)
+      klass
     end
 
-    def raise_error(result)
-      fail ContentError[@path, result]
-    end
-
-    def set_number
-      Pathname.new(@path).basename(".rb").to_s[/^[^_]+/]
-    end
-
-    def check_content
-      @content[/ROM::Migrator\.migration\s+(do|\{)/]
+    def raise_error
+      fail ContentError[number]
     end
 
     def subclass_of_migration?(object)
-      return unless object.respond_to? :superclass
-      Migration.equal? object.superclass
+      object.ancestors.include? Migration rescue nil
     end
 
   end # class MigrationFile

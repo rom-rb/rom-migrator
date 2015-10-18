@@ -1,7 +1,7 @@
 # encoding: utf-8
 
 describe ROM::Migrator::Errors::ContentError do
-  let(:error) { described_class.new "foo/bar", :foo }
+  let(:error) { described_class.new "foo" }
 
   describe ".new" do
     subject { error }
@@ -12,9 +12,8 @@ describe ROM::Migrator::Errors::ContentError do
   describe "#message" do
     subject { error.message }
 
-    it { is_expected.to include "File 'foo/bar'" }
-    it { is_expected.to include "doesn't define a migration properly" }
-    it { is_expected.to include ":foo" }
+    it { is_expected.to include "migration number 'foo'" }
+    it { is_expected.to include "is not valid" }
   end # describe #message
 
 end # describe ROM::Migrator::Errors::ContentError

@@ -24,19 +24,34 @@ describe ROM::Migrator::MigrationFiles do
   end # describe #each
 
   describe "#with_numbers" do
-    it "selects files by numbers" do
-      subject = files.with_numbers %w(bar baz)
-      expect(subject).to collect_files_with_numbers %w(bar baz)
+    context "of existing files" do
+      subject { files.with_numbers %w(bar baz) }
+
+      it "selects files by numbers" do
+        expect(subject).to collect_files_with_numbers %w(bar baz)
+      end
     end
 
-    it "fails when a number is absent" do
-      expect { files.with_numbers(%w(bar baz qux)) }
-        .to raise_error ROM::Migrator::Errors::NotFoundError, /qux/
+    context "of missed files [strictly]" do
+      subject { files.with_numbers %w(bar baz qux) }
+
+      it "fails" do
+        expect { subject }
+          .to raise_error ROM::Migrator::Errors::NotFoundError, /qux/
+      end
     end
 
-    it "selects files by existing numbers" do
-      subject = files.with_numbers %w(bar baz qux), false
-      expect(subject).to collect_files_with_numbers %w(bar baz)
+    context "of missed files [not strictly]" do
+      subject { files.with_numbers %w(bar baz qux), false }
+
+      it "selects files by numbers" do
+        expect(subject).to collect_files_with_numbers %w(bar baz qux)
+      end
+
+      it "mocks missed files" do
+        missed_file = subject.to_a.last
+        expect(missed_file.content).to eql "ROM::Migrator.migration"
+      end
     end
   end # describe #with_numbers
 
@@ -110,9 +125,9 @@ describe ROM::Migrator::MigrationFiles do
     end
   end # describe #to_migrations
 
-  describe ".from", :memfs do
+  describe ".from_folders", :memfs do
     include_context :migrations
-    subject { described_class.from paths }
+    subject { described_class.from_folders paths }
 
     it "creates the collection" do
       expect(subject).to be_kind_of described_class
@@ -121,7 +136,7 @@ describe ROM::Migrator::MigrationFiles do
     it "populates the collection with migration files from given folders" do
       expect(subject.map(&:number)).to contain_exactly("1", "2", "3")
     end
-  end # describe .from
+  end # describe .from_folders
 
   RSpec::Matchers.define :collect_files_with_numbers do |nums|
     match do |actual|

@@ -5,12 +5,15 @@ describe ROM::Migrator do
   let(:klass)     { Class.new(described_class) }
   let(:generator) { ROM::Migrator::Generator }
   let(:migrator)  { klass.new gateway, options }
+  let(:gateway)   { double(:gateway).as_null_object }
 
-  let(:gateway) { double(:gateway).as_null_object }
-  let(:options) { { logger: logger, path: path, counter: counter } }
-  let(:logger)  { Logger.new StringIO.new }
-  let(:counter) { -> prev { prev.to_i + 2 } }
-  let(:path)    { "/db/migrate" }
+  let(:options) do
+    { logger: logger, path: path, counter: counter, template: template }
+  end
+  let(:logger)   { Logger.new StringIO.new }
+  let(:counter)  { -> prev { prev.to_i + 2 } }
+  let(:path)     { "/db/migrate" }
+  let(:template) { "/config/custom" }
 
   it "uses the DSL" do
     expect(klass).to be_kind_of ROM::Migrator::ClassDSL
@@ -52,6 +55,20 @@ describe ROM::Migrator do
 
       it "uses default logger" do
         expect(subject).to eql klass.settings.logger
+      end
+    end
+  end # describe #logger
+
+  describe "#template" do
+    subject { migrator.template }
+
+    it { is_expected.to eql template }
+
+    context "by default" do
+      before { options.delete :template }
+
+      it "uses default logger" do
+        expect(subject).to eql klass.settings.template
       end
     end
   end # describe #logger
@@ -256,7 +273,7 @@ describe ROM::Migrator do
       end
 
       it "logs the results" do
-        expect(logger).to receive(:info).twice
+        expect(logger).to receive(:info).exactly(3).times
       end
     end
   end # describe #reverse

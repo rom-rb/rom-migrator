@@ -13,7 +13,6 @@ class ROM::Migrator
   class MigrationFiles
 
     include ROM::Options, Enumerable, Errors, Immutability
-    option :skip_missing, reader: true
 
     # Builds the collection of valid migration files from a list of paths
     # to folders containing migrations
@@ -24,10 +23,10 @@ class ROM::Migrator
     #
     # @return [ROM::Migrator::MigrationFiles]
     #
-    def self.from(paths)
+    def self.from_folders(paths)
       new paths
         .flat_map { |folder| Dir[File.join(folder, "**/*.rb")] }
-        .map(&MigrationFile.method(:new))
+        .map(&MigrationFile.method(:from_file))
         .select(&:valid?)
     end
 
@@ -37,7 +36,6 @@ class ROM::Migrator
     #
     def initialize(files)
       @files = files
-      super options
     end
 
     # Iterates through files
@@ -59,8 +57,7 @@ class ROM::Migrator
     #   when migration with given number is absent
     #
     def with_numbers(numbers, strict = true)
-      numbers = numbers.flatten
-      update { @files = numbers.map { |num| search(num, strict) }.compact }
+      update { @files = numbers.map { |num| search(num, strict) } }
     end
 
     # Returns a subset of files with numbers greater than given one(s)
@@ -110,7 +107,7 @@ class ROM::Migrator
     def search(number, strict)
       result = detect { |file| file.number.eql? number }
       return result if result
-      fail NotFoundError[number] if strict
+      strict ? fail(NotFoundError[number]) : MigrationFile.new(number: number)
     end
 
   end # class MigrationFiles

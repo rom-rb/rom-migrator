@@ -135,7 +135,7 @@ module ROM
     private
 
     def files
-      MigrationFiles.from paths
+      MigrationFiles.from_folders paths
     end
 
     def migration_options

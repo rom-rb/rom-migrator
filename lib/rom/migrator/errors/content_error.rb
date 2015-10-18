@@ -10,13 +10,12 @@ module ROM::Migrator::Errors
 
     # Initializes the exception for a filepath and result of loading.
     #
-    # @param [#to_s] path The path to the file
-    # @param [Object] error The result of loading a file
+    # @param [#to_s] number The number of migration
     #
-    def initialize(path, result)
+    def initialize(number)
       super <<-MESSAGE
-        |File '#{path}' doesn't define a migration properly.
-        |  Expected a migration file to return a subclass of ROM::Migration:
+        |The definition of migration number '#{number}' is not valid.
+        |Expected a file to return a subclass of ROM::Migrator::Migration:
         |
         |    ROM::Migrator.migration do
         |      up do
@@ -27,8 +26,6 @@ module ROM::Migrator::Errors
         |        # some definitions here
         |      end
         |    end
-        |
-        |  Actual result of loading: #{result.inspect}
         |
       MESSAGE
     end
