@@ -47,4 +47,4 @@ describe ROM::Migrator::Migrations do
     end
   end # describe #reverse
 
-end # describe ROM::Migrator::MigrationFiles
+end # describe ROM::Migrator::Migrations

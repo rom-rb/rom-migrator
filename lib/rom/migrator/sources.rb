@@ -10,7 +10,7 @@ class ROM::Migrator
   #
   # @api private
   #
-  class MigrationFiles
+  class Sources
 
     include ROM::Options, Enumerable, Errors, Immutability
 
@@ -21,18 +21,18 @@ class ROM::Migrator
     # @param [Hash] options
     # @option options (see #initialize)
     #
-    # @return [ROM::Migrator::MigrationFiles]
+    # @return [ROM::Migrator::Sources]
     #
     def self.from_folders(paths)
       new paths
         .flat_map { |folder| Dir[File.join(folder, "**/*.rb")] }
-        .map(&MigrationFile.method(:from_file))
+        .map(&Source.method(:from_file))
         .select(&:valid?)
     end
 
     # Initializes the collection with a list of migration files
     #
-    # @param [Array<ROM::Migrator::MigrationFile>] files
+    # @param [Array<ROM::Migrator::Source>] files
     #
     def initialize(files)
       @files = files
@@ -40,9 +40,9 @@ class ROM::Migrator
 
     # Iterates through files
     #
-    # @return [Enumerator<ROM::Migrator::MigrationFile>]
+    # @return [Enumerator<ROM::Migrator::Source>]
     #
-    # @yieldparam [ROM::Migrator::MigrationFile] file
+    # @yieldparam [ROM::Migrator::Source] file
     #
     def each
       block_given? ? @files.each { |file| yield(file) } : to_enum
@@ -64,7 +64,7 @@ class ROM::Migrator
     #
     # @param [String, Array<String>] numbers
     #
-    # @return [ROM::Migrator::MigrationFiles]
+    # @return [ROM::Migrator::Sources]
     #
     def after_numbers(*numbers)
       numbers = numbers.flatten.compact
@@ -76,7 +76,7 @@ class ROM::Migrator
     #
     # @param [String, nil] number
     #
-    # @return [ROM::Migrator::MigrationFiles]
+    # @return [ROM::Migrator::Sources]
     #
     def upto_number(number = nil)
       return self unless number
@@ -94,7 +94,7 @@ class ROM::Migrator
     # Returns the collection of migrations loaded from files and
     # instantiated with given migrator and logger
     #
-    # @param (see ROM::Migrator::MigrationFile#to_migration)
+    # @param (see ROM::Migrator::Source#to_migration)
     #
     # @return [ROM::Migrator::Migrations]
     #
@@ -107,9 +107,9 @@ class ROM::Migrator
     def search(number, strict)
       result = detect { |file| file.number.eql? number }
       return result if result
-      strict ? fail(NotFoundError[number]) : MigrationFile.new(number: number)
+      strict ? fail(NotFoundError[number]) : Source.new(number: number)
     end
 
-  end # class MigrationFiles
+  end # class Sources
 
 end # class ROM::Migrator

@@ -2,13 +2,10 @@
 
 class ROM::Migrator
 
-  # A simple immutable structure describing numbered migration file
-  #
-  # Responcible for exposing migration's number and instantiating
-  # the migration when necessary.
+  # A simple immutable structure describing a source for migrations
   #
   # @example Instantiates the migration described in a file by [#path]
-  #   file = MigrationFile.new(
+  #   file = Source.new(
   #     path: "/db/migrate/20170101120342822_create_users.rb"
   #   )
   #   file.number # => "20170101120342822"
@@ -18,17 +15,17 @@ class ROM::Migrator
   #
   # @author nepalez <andrew.kozin@gmail.com>
   #
-  class MigrationFile
+  class Source
 
     include ROM::Options, Errors, Immutability
     option :number,  reader: true, coercer: -> num { num.to_s }
     option :content, reader: true, default: "ROM::Migrator.migration"
 
-    # Loads the migration file from disk
+    # Loads the source from file
     #
     # @param [String] path
     #
-    # @return [ROM::Migrator::MigrationFile]
+    # @return [ROM::Migrator::Source]
     #
     def self.from_file(path)
       number = Pathname.new(path).basename(".rb").to_s[/^[^_]+/]
@@ -80,6 +77,6 @@ class ROM::Migrator
       object.ancestors.include? Migration rescue nil
     end
 
-  end # class MigrationFile
+  end # class Source
 
 end # class ROM::Migrator

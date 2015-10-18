@@ -1,39 +1,39 @@
 # encoding: utf-8
-describe ROM::Migrator::MigrationFiles do
+describe ROM::Migrator::Sources do
 
-  let(:files) { described_class.new [foo, bar, baz] }
+  let(:sources) { described_class.new [foo, bar, baz] }
 
   let(:foo) { frozen_double(number: "foo", to_migration: :migration_foo) }
   let(:bar) { frozen_double(number: "bar", to_migration: :migration_bar) }
   let(:baz) { frozen_double(number: "baz", to_migration: :migration_baz) }
 
   describe ".new" do
-    subject { files }
+    subject { sources }
 
     it { is_expected.to be_immutable }
   end # describe .new
 
   describe "#each" do
-    subject { files.each }
+    subject { sources.each }
 
     it { is_expected.to be_kind_of Enumerator }
 
-    it "iterates through files" do
+    it "iterates through sources" do
       expect(subject.map(&:number)).to contain_exactly("bar", "baz", "foo")
     end
   end # describe #each
 
   describe "#with_numbers" do
-    context "of existing files" do
-      subject { files.with_numbers %w(bar baz) }
+    context "of existing sources" do
+      subject { sources.with_numbers %w(bar baz) }
 
-      it "selects files by numbers" do
-        expect(subject).to collect_files_with_numbers %w(bar baz)
+      it "selects sources by numbers" do
+        expect(subject).to collect_sources_with_numbers %w(bar baz)
       end
     end
 
-    context "of missed files [strictly]" do
-      subject { files.with_numbers %w(bar baz qux) }
+    context "of missed sources [strictly]" do
+      subject { sources.with_numbers %w(bar baz qux) }
 
       it "fails" do
         expect { subject }
@@ -41,79 +41,79 @@ describe ROM::Migrator::MigrationFiles do
       end
     end
 
-    context "of missed files [not strictly]" do
-      subject { files.with_numbers %w(bar baz qux), false }
+    context "of missed sources [not strictly]" do
+      subject { sources.with_numbers %w(bar baz qux), false }
 
-      it "selects files by numbers" do
-        expect(subject).to collect_files_with_numbers %w(bar baz qux)
+      it "selects sources by numbers" do
+        expect(subject).to collect_sources_with_numbers %w(bar baz qux)
       end
 
-      it "mocks missed files" do
-        missed_file = subject.to_a.last
-        expect(missed_file.content).to eql "ROM::Migrator.migration"
+      it "mocks missed sources" do
+        missed_source = subject.to_a.last
+        expect(missed_source.content).to eql "ROM::Migrator.migration"
       end
     end
   end # describe #with_numbers
 
   describe "#after_numbers" do
     context "empty" do
-      subject { files.after_numbers }
+      subject { sources.after_numbers }
 
-      it { is_expected.to eql files }
+      it { is_expected.to eql sources }
     end
 
     context "one number" do
-      subject { files.after_numbers("bar") }
+      subject { sources.after_numbers("bar") }
 
-      it { is_expected.to collect_files_with_numbers %w(baz foo) }
+      it { is_expected.to collect_sources_with_numbers %w(baz foo) }
     end
 
     context "list of numbers" do
-      subject { files.after_numbers("bar", ["baz"], nil) }
+      subject { sources.after_numbers("bar", ["baz"], nil) }
 
-      it { is_expected.to collect_files_with_numbers %w(foo) }
+      it { is_expected.to collect_sources_with_numbers %w(foo) }
     end
 
     context "absent number" do
-      subject { files.after_numbers("elf") }
+      subject { sources.after_numbers("elf") }
 
-      it { is_expected.to collect_files_with_numbers %w(foo) }
+      it { is_expected.to collect_sources_with_numbers %w(foo) }
     end
   end # describe #after_numbers
 
   describe "#upto_number" do
     context "with value" do
-      subject { files.upto_number("baz") }
+      subject { sources.upto_number("baz") }
 
-      it { is_expected.to collect_files_with_numbers %w(bar baz) }
+      it { is_expected.to collect_sources_with_numbers %w(bar baz) }
     end
 
     context "without value" do
-      subject { files.upto_number }
+      subject { sources.upto_number }
 
-      it { is_expected.to eql files }
+      it { is_expected.to eql sources }
     end
   end # describe #after_numbers
 
   describe "#last_number" do
-    subject { files.last_number }
+    subject { sources.last_number }
 
     it { is_expected.to eql "foo" }
 
-    context "when files are absent" do
-      let(:files) { described_class.new [] }
+    context "when sources are absent" do
+      let(:sources) { described_class.new [] }
 
       it { is_expected.to eql "" }
     end
   end # describe #last_number
 
   describe "#to_migrations" do
-    subject { files.to_migrations(migrator) }
+    subject { sources.to_migrations(migrator) }
     let(:migrator) { double :migrator }
 
-    it "converts all files to migrations" do
-      [foo, bar, baz].each do |file|
-        expect(file).to receive(:to_migration).with(migrator).once
+    it "converts all sources to migrations" do
+      [foo, bar, baz].each do |source|
+        expect(source).to receive(:to_migration).with(migrator).once
       end
       subject
     end
@@ -133,16 +133,16 @@ describe ROM::Migrator::MigrationFiles do
       expect(subject).to be_kind_of described_class
     end
 
-    it "populates the collection with migration files from given folders" do
+    it "populates the collection from files in given folders" do
       expect(subject.map(&:number)).to contain_exactly("1", "2", "3")
     end
   end # describe .from_folders
 
-  RSpec::Matchers.define :collect_files_with_numbers do |nums|
+  RSpec::Matchers.define :collect_sources_with_numbers do |nums|
     match do |actual|
       expect(actual).to be_kind_of described_class
       expect(actual.map(&:number)).to match_array nums
     end
-  end # matcher collect_files_with_numbers
+  end # matcher collect_sources_with_numbers
 
-end # describe ROM::Migrator::MigrationFiles
+end # describe ROM::Migrator::Sources

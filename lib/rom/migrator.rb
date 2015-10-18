@@ -6,16 +6,16 @@ require "rom"
 
 module ROM
 
-  require_relative "migrator/errors"          # gem-specific errors
-  require_relative "migrator/logger"          # default logger for migration
-  require_relative "migrator/settings"        # adapter-specific settings
-  require_relative "migrator/registrar"       # registers migrations
-  require_relative "migrator/migration"       # changes the persistence
-  require_relative "migrator/migrations"      # defines the order of migrations
-  require_relative "migrator/migration_file"  # describes files
-  require_relative "migrator/migration_files" # filters files by their numbers
-  require_relative "migrator/generator"       # scaffolds migrations
-  require_relative "migrator/class_dsl"       # sets registrar and settings
+  require_relative "migrator/errors"     # gem-specific errors
+  require_relative "migrator/logger"     # default logger for migration
+  require_relative "migrator/settings"   # adapter-specific settings
+  require_relative "migrator/registrar"  # registers migrations
+  require_relative "migrator/migration"  # changes the persistence
+  require_relative "migrator/migrations" # defines the order of migrations
+  require_relative "migrator/source"     # describes sources for migrations
+  require_relative "migrator/sources"    # filters sources by their numbers
+  require_relative "migrator/generator"  # scaffolds a migration
+  require_relative "migrator/class_dsl"  # sets registrar and settings
 
   # The abstract base class for adapter-specific migrators
   #
@@ -135,7 +135,7 @@ module ROM
     private
 
     def files
-      MigrationFiles.from_folders paths
+      Sources.from_folders(paths)
     end
 
     def migration_options

@@ -1,5 +1,5 @@
 # encoding: utf-8
-describe ROM::Migrator::MigrationFile do
+describe ROM::Migrator::Source do
 
   let(:source)  { described_class.new options }
   let(:options) { { number: number, content: content } }
@@ -134,4 +134,4 @@ describe ROM::Migrator::MigrationFile do
     end
   end # describe #to_migration
 
-end # describe ROM::Migrator::MigrationFile
+end # describe ROM::Migrator::Source
